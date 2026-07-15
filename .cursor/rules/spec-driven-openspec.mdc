@@ -10,19 +10,31 @@ alwaysApply: true
 ## 開始前
 
 1. 閱讀 `AGENTS.md` 與 `openspec/config.yaml` 的專案脈絡。
-2. 若需求尚不明確，使用 `/opsx:explore`。
-3. 若已清楚要做什麼，使用 `/opsx:propose "<change-name>"` 建立 change。
+2. 對照 `ROADMAP.md` 該里程碑的交付物與 Non-goals。
+3. 若需求尚不明確，使用 `/opsx:explore`。
+4. 若已清楚要做什麼，使用 `/opsx:propose "<change-name>"` 建立 change；`proposal.md` **必須**含 Non-goals。
 
 ## 實作時
 
-- 依 `openspec/changes/<name>/tasks.md` 逐步完成，不要跳過 spec 對齊。
+- 依 `openspec/changes/<name>/tasks.md` 逐步完成，**不可跳步**。
 - 實作前確認 `proposal.md`、`design.md` 與 spec delta 已就緒。
+- 遵守 `AGENTS.md` 模組禁令（`tools/` 不 import CrewAI、`cli.py` 不直接呼叫 tools）。
 - 完成後執行 `/opsx:archive` 將 delta 合併至 `openspec/specs/`。
 
-## 驗證
+## 驗證（硬性）
+
+提交、歸檔或發版前**必須**通過：
 
 ```bash
+./scripts/check.sh
+```
+
+**禁止**單跑 `validate --strict`（不含 `--changes` 或 `--specs`）。
+
+等價指令：
+
+```bash
+uv run pytest
 npx @fission-ai/openspec@latest validate --changes --strict
 npx @fission-ai/openspec@latest validate --specs --strict
-uv run pytest
 ```

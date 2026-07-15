@@ -20,13 +20,15 @@
 - [ ] `tasks.md` 全部 `[x]`
 - [ ] delta 已 sync 至 `openspec/specs/`
 - [ ] change 已 archive（發版時應無 active change）
-- [ ] `uv run pytest` 全過
-- [ ] `npx @fission-ai/openspec@latest validate --changes --strict`
-- [ ] `npx @fission-ai/openspec@latest validate --specs --strict`
+- [ ] `./scripts/check.sh` 全過（或等價的三項驗證指令）
 
-發版額外項目（見 [LESSONS.md](LESSONS.md)）：
+**禁止**單跑 `validate --strict`（不含 `--changes` 或 `--specs`）。
+
+發版額外項目（見 [LESSONS.md](LESSONS.md) 與 [AGENTS.md](AGENTS.md)）：
 
 - [ ] `pyproject.toml` 與 `src/council_agent/__init__.py` 版本一致
+- [ ] `openspec/config.yaml` 版號與 `ROADMAP.md`「現況」已更新
+- [ ] 版本 bump **僅**在 `release/*` 分支完成（**禁止**在 `feature/*` 上 release）
 - [ ] `release/<version>` 合併至 `main` 並打 tag
 - [ ] `release/<version>` 以 `--no-ff` 合併回 `develop`
 
@@ -60,6 +62,14 @@ This project follows [git-flow](https://nvie.com/posts/a-successful-git-branchin
 4. When ready to release, branch `release/<version>` from `develop`
 5. Merge `release/*` to `main` (tag) and back to `develop`
 
+### 禁止事項
+
+- **禁止** `feature/*` 直接 merge 至 `main`
+- **禁止**在 `feature/*` 上執行 `chore: release` 或打 release tag
+- **禁止**從 `main` 以外開 `release/*`（release 只能從 `develop` 開出）
+- **禁止** hotfix 從 `develop` 開出（hotfix 只能從 `main` 開出）
+- **禁止**發版時 `openspec/changes/` 仍有 active change
+
 ## Commit Conventions
 
 Format: `<type>(<scope>): <subject>`
@@ -86,5 +96,5 @@ test: add preset loading unit tests
 uv sync --extra dev
 cp .env.example .env   # add your OPENROUTER_API_KEY
 uv run council presets list
-uv run pytest
+./scripts/check.sh     # pytest + openspec validate（需 Node.js ≥ 20.19）
 ```

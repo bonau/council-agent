@@ -4,7 +4,7 @@
 
 > **開發方式**：所有版本里程碑的實作，皆採 **Spec-driven Development** 並搭配 [OpenSpec](https://github.com/Fission-AI/OpenSpec)。每個 feature 分支應對應一個 OpenSpec change，詳見 [AGENTS.md](AGENTS.md)。
 
-## 現況（v0.4.0）
+## 現況（v0.5.0）
 
 | 能力 | 狀態 |
 |------|------|
@@ -16,11 +16,12 @@
 | `run_tests` + 結構化 pytest 報告 | ✅ |
 | Tool 呼叫追蹤與 `max_tool_calls` 上限 | ✅ |
 | Verification 讀取 tool 執行摘要 | ✅ |
-| Execution Crew 掛載 tools | ❌（v0.5） |
-| `council sandbox` CLI | ❌（v0.5） |
+| Execution Crew 掛載 tools | ✅ |
+| `council sandbox` CLI（init / status / `--workspace`） | ✅ |
+| Session 紀錄（`.council/sessions/`） | ✅ |
 | 安全 / 信任 / 審計 | ❌（v0.6+） |
 
-Tool 函式已實作並經單元／整合測試驗證；Orchestrator 可收集 tool 摘要傳至 Verification，但 Execution Crew 尚未掛載 tools，CLI 仍為純文字管線。
+Sandbox MVP 已發佈：使用者可 `council sandbox init`，Execution Crew 透過 tools 在工作區 CRUD 檔案並跑測試；有 `.council/` 時寫入 session。
 
 ## 目標里程碑
 
@@ -170,12 +171,12 @@ uv run council sandbox status
 
 **v0.5 完成定義（Definition of Done）**
 
-- [ ] 在任意 cwd 執行 `council sandbox init` 可建立 `.council/`
-- [ ] Agent 可建立、修改、刪除工作區內檔案
-- [ ] Agent 可執行 `pytest` 並取得真實結果
-- [ ] 路徑穿越與敏感檔案存取被阻擋
-- [ ] Verification 參考測試結果做出 PASS/FAIL 判斷
-- [ ] 單次 run 的 tool 呼叫有上限保護
+- [x] 在任意 cwd 執行 `council sandbox init` 可建立 `.council/`
+- [x] Agent 可建立、修改、刪除工作區內檔案
+- [x] Agent 可執行 `pytest` 並取得真實結果
+- [x] 路徑穿越與敏感檔案存取被阻擋
+- [x] Verification 參考測試結果做出 PASS/FAIL 判斷
+- [x] 單次 run 的 tool 呼叫有上限保護
 
 ---
 
@@ -378,4 +379,4 @@ v0.1.0 (現況)
 
 ---
 
-*最後更新：2026-07-15 · 策略：Tool-First 漸進式 · 開發方式：Spec-driven + OpenSpec*
+*最後更新：2026-07-16 · 策略：Tool-First 漸進式 · 開發方式：Spec-driven + OpenSpec*
