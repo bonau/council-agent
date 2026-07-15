@@ -149,3 +149,15 @@ src/council_agent/
 - [ROADMAP.md](ROADMAP.md) — 版本路線圖
 - [LESSONS.md](LESSONS.md) — 開發踩坑與實務經驗
 - [OpenSpec 文件](https://github.com/Fission-AI/OpenSpec)
+
+## Cursor Cloud specific instructions
+
+環境由 update script 自動處理（安裝 `uv` 至 `~/.local/bin`，並執行 `uv sync --extra dev`）。標準指令見 [README.md](README.md) 與 `scripts/check.sh`；以下僅記錄非顯而易見的注意事項：
+
+- **`uv` 位於 `~/.local/bin`**：已加入 `~/.bashrc` 的 PATH，互動式 shell 可直接用 `uv`。非互動情境若找不到，改用 `"$HOME/.local/bin/uv"`。Python 3.12、Node 22 皆已預裝（OpenSpec CLI 需 Node ≥ 20.19）。
+- **`OPENROUTER_API_KEY` 是必填設定**：`config/settings.py` 的 `Settings.openrouter_api_key` 無預設，**任何** CLI 指令與 `uv run pytest` 都會在 import 期讀取它。未設定會使整個測試套件因 `ValidationError` 失敗（並非程式壞掉）。
+  - 測試與離線指令（`presets list`、`sandbox init/status`）只需**任意非空值**即可（LLM 呼叫皆被 mock）。
+  - 建議以 **Secret 注入**（環境變數）提供，pydantic 會直接讀環境變數，**不需** `.env`；本機 `.env`（gitignored）亦可。環境變數優先於 `.env`。
+- **`council run` 才會真的打網路**：完整三階段管線會呼叫 OpenRouter，需**有效**的 `OPENROUTER_API_KEY`；無效金鑰會得到 `401 AuthenticationError`（代表管線接線正常，只差金鑰）。
+- **Lint/驗證門檻**＝ `./scripts/check.sh`（`uv run pytest` + `openspec validate --changes/--specs --strict`）。本專案無 ruff/flake8；「lint」即 OpenSpec 規格驗證。**禁止**裸跑 `validate --strict`。
+- **不要在 repo 根目錄跑 `council sandbox init`**：會建立 `.council/`（`sessions/` 已 gitignored）。示範時用獨立目錄，例如 `-w ~/workspace/council-demo`。
