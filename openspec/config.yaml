@@ -12,12 +12,11 @@ context: |
   Current version: v0.4.0 — run_tests, tool call tracking, verification summaries
   Capabilities: tools (filesystem, shell, run_tests), sandbox (WorkspaceGuard), orchestration (tracker, max_tool_calls)
 
-# Per-artifact rules (optional)
-# Add custom rules for specific artifacts.
-# Example:
-#   rules:
-#     proposal:
-#       - Keep proposals under 500 words
-#       - Always include a "Non-goals" section
-#     tasks:
-#       - Break tasks into chunks of max 2 hours
+rules:
+  proposal:
+    - proposal.md MUST include a "Non-goals" section aligned with ROADMAP.md for the target milestone
+    - Capabilities MUST map to existing or new openspec/specs/<name>/ directories
+  tasks:
+    - Multi-layer changes MUST follow progressive integration order (pure functions → wiring → framework → e2e)
+    - Each task section MUST be independently verifiable with uv run pytest before moving to the next
+    - Verification section MUST list pytest and both openspec validate commands (--changes and --specs)
