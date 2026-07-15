@@ -24,8 +24,11 @@ CLI 輔助（需 Node.js ≥ 20.19）：
 
 ```bash
 npx @fission-ai/openspec@latest status
-npx @fission-ai/openspec@latest validate --strict
+npx @fission-ai/openspec@latest validate --changes --strict
+npx @fission-ai/openspec@latest validate --specs --strict
 ```
+
+常見陷阱與實務經驗見 [LESSONS.md](LESSONS.md)。
 
 ## 目錄結構
 
@@ -58,4 +61,5 @@ openspec/
 
 - [CONTRIBUTING.md](CONTRIBUTING.md) — Git Flow 與 commit 規範
 - [ROADMAP.md](ROADMAP.md) — 版本路線圖
+- [LESSONS.md](LESSONS.md) — 開發踩坑與實務經驗
 - [OpenSpec 文件](https://github.com/Fission-AI/OpenSpec)
