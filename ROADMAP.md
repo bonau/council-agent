@@ -4,7 +4,7 @@
 
 > **開發方式**：所有版本里程碑的實作，皆採 **Spec-driven Development** 並搭配 [OpenSpec](https://github.com/Fission-AI/OpenSpec)。每個 feature 分支應對應一個 OpenSpec change，詳見 [AGENTS.md](AGENTS.md)。
 
-## 現況（v0.5 — Sandbox MVP 已實作，待 release/0.5.0）
+## 現況（v0.5.0）
 
 | 能力 | 狀態 |
 |------|------|
@@ -21,7 +21,7 @@
 | Session 紀錄（`.council/sessions/`） | ✅ |
 | 安全 / 信任 / 審計 | ❌（v0.6+） |
 
-Sandbox MVP 已完成：使用者可 `council sandbox init`，Execution Crew 透過 tools 在工作區 CRUD 檔案並跑測試；有 `.council/` 時寫入 session。套件版號仍為 0.4.0，待確認後走 `release/0.5.0`。
+Sandbox MVP 已發佈：使用者可 `council sandbox init`，Execution Crew 透過 tools 在工作區 CRUD 檔案並跑測試；有 `.council/` 時寫入 session。
 
 ## 目標里程碑
 
@@ -379,4 +379,4 @@ v0.1.0 (現況)
 
 ---
 
-*最後更新：2026-07-15 · 策略：Tool-First 漸進式 · 開發方式：Spec-driven + OpenSpec*
+*最後更新：2026-07-16 · 策略：Tool-First 漸進式 · 開發方式：Spec-driven + OpenSpec*
