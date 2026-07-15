@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Reusable file system and shell tool functions that return a unified `ToolResult` structure. Introduced in v0.2 as a foundation layer; v0.3 adds WorkspaceGuard boundary enforcement. CrewAI integration planned for v0.5.
+Reusable file system and shell tool functions that return a unified `ToolResult` structure. Introduced in v0.2 as a foundation layer; v0.3 adds WorkspaceGuard boundary enforcement; v0.4 adds `run_tests` with structured pytest reports. CrewAI integration planned for v0.5.
 
 ## Requirements
 
@@ -114,6 +114,30 @@ The system SHALL provide `run_command(command: str, cwd: str | None = None, *, t
 
 - **WHEN** `run_command` is called with a `cwd` argument
 - **THEN** the command executes in the specified working directory
+
+### Requirement: run_tests executes pytest with structured report
+
+The system SHALL provide `run_tests(path: str = ".", args: str = "", *, timeout_sec: int = 120) -> ToolResult` that runs pytest within the workspace. On completion, `metadata` SHALL include `exit_code`, `passed`, `failed`, `skipped`, and `failures` (list of failure summary strings). `success` SHALL be True only when exit code is 0.
+
+#### Scenario: All tests pass
+
+- **WHEN** `run_tests` is executed and all tests pass
+- **THEN** it returns `success=True`, `metadata.exit_code` is 0, and `metadata.failed` is 0
+
+#### Scenario: Some tests fail
+
+- **WHEN** `run_tests` is executed and one or more tests fail
+- **THEN** it returns `success=False`, `metadata.exit_code` is non-zero, and `metadata.failures` contains at least one summary string
+
+#### Scenario: Test path outside workspace
+
+- **WHEN** `run_tests` is called with a path outside the workspace root
+- **THEN** it returns `success=False` with a workspace boundary error
+
+#### Scenario: Custom pytest args
+
+- **WHEN** `run_tests` is called with additional `args` (e.g. `-k test_foo`)
+- **THEN** those arguments are passed to pytest
 
 ### Requirement: Tools are not integrated with Execution Crew
 

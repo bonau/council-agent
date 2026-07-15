@@ -26,4 +26,4 @@
 ## 5. Verification
 
 - [x] 5.1 Run `uv run pytest`
-- [x] 5.2 Run `npx @fission-ai/openspec@latest validate --strict`
+- [x] 5.2 Run `npx @fission-ai/openspec@latest validate --changes --strict` and `validate --specs --strict`

@@ -8,6 +8,12 @@ OpenRouter + CrewAI 三階段 CLI 框架：每次推論依序經過 **計劃 →
 - 內建兩組模型 Preset，全部透過 OpenRouter 路由
 - Typer CLI 介面，支援 `--verbose` 顯示各階段輸出
 - 校驗失敗時自動 escalation（可設定 `max_retries`）
+- Tool 基礎層：`read_file`、`write_file`、`list_dir`、`delete_file`、`run_command`、`run_tests`
+- `WorkspaceGuard` 限制檔案與 shell 操作在工作區內
+- Tool 呼叫追蹤與 `max_tool_calls` 上限（預設 50）
+- Verification 可接收結構化 tool 執行摘要（含 pytest 結果）
+
+> **安全提示**：`run_command` 使用 `shell=True` 執行指令。請僅在信任的專案目錄使用，並避免將不受信任的 prompt 直接餵給 Agent。完整安全機制（指令分類、信任階梯、審計）規劃見 [ROADMAP.md](ROADMAP.md) v0.6+。
 
 ## Presets
 
@@ -58,6 +64,8 @@ uv run council run "設計 REST API 規格" -p grok-stack --verbose
 |------|------|------|
 | `OPENROUTER_API_KEY` | OpenRouter API 金鑰 | （必填） |
 | `COUNCIL_DEFAULT_PRESET` | 預設 preset 名稱 | `glm-stack` |
+| `COUNCIL_WORKSPACE_ROOT` | Tool 工作區根目錄 | 目前工作目錄 |
+| `COUNCIL_MAX_TOOL_CALLS` | 單次 run 的 tool 呼叫上限 | `50` |
 
 ## 開發
 
@@ -65,6 +73,8 @@ uv run council run "設計 REST API 規格" -p grok-stack --verbose
 
 ```bash
 uv run pytest
+npx @fission-ai/openspec@latest validate --changes --strict
+npx @fission-ai/openspec@latest validate --specs --strict
 npx @fission-ai/openspec@latest status   # 查看 OpenSpec 變更狀態
 ```
 

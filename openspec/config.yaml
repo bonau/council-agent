@@ -9,8 +9,8 @@ context: |
   Testing: uv run pytest
   Docs: README.md, ROADMAP.md, CONTRIBUTING.md, AGENTS.md
   Development policy: Spec-driven Development with OpenSpec (see AGENTS.md)
-  Current version: v0.3.0 — workspace guard with path boundary enforcement
-  Roadmap: Tool-First incremental (see ROADMAP.md for v0.2–v1.0 milestones)
+  Current version: v0.4.0 — run_tests, tool call tracking, verification summaries
+  Capabilities: tools (filesystem, shell, run_tests), sandbox (WorkspaceGuard), orchestration (tracker, max_tool_calls)
 
 # Per-artifact rules (optional)
 # Add custom rules for specific artifacts.

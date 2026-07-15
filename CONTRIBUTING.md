@@ -10,8 +10,25 @@
 2. **提案** → `/opsx:propose "<change-name>"` 產生 proposal、design、tasks、spec delta
 3. **審閱** → 確認 artifacts 無誤
 4. **實作** → `/opsx:apply`，依 tasks.md 逐步完成
-5. **驗證** → `npx @fission-ai/openspec@latest validate --strict` 與 `uv run pytest`
+5. **驗證** → 執行下方 Definition of Done 中的驗證指令
 6. **歸檔** → `/opsx:archive` 將 delta 合併至 `openspec/specs/`
+
+### Definition of Done
+
+完成 change 或準備發版前，確認：
+
+- [ ] `tasks.md` 全部 `[x]`
+- [ ] delta 已 sync 至 `openspec/specs/`
+- [ ] change 已 archive（發版時應無 active change）
+- [ ] `uv run pytest` 全過
+- [ ] `npx @fission-ai/openspec@latest validate --changes --strict`
+- [ ] `npx @fission-ai/openspec@latest validate --specs --strict`
+
+發版額外項目（見 [LESSONS.md](LESSONS.md)）：
+
+- [ ] `pyproject.toml` 與 `src/council_agent/__init__.py` 版本一致
+- [ ] `release/<version>` 合併至 `main` 並打 tag
+- [ ] `release/<version>` 以 `--no-ff` 合併回 `develop`
 
 ### 環境需求
 

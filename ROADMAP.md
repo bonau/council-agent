@@ -4,18 +4,23 @@
 
 > **開發方式**：所有版本里程碑的實作，皆採 **Spec-driven Development** 並搭配 [OpenSpec](https://github.com/Fission-AI/OpenSpec)。每個 feature 分支應對應一個 OpenSpec change，詳見 [AGENTS.md](AGENTS.md)。
 
-## 現況（v0.1.0）
+## 現況（v0.4.0）
 
 | 能力 | 狀態 |
 |------|------|
 | 三階段管線（Planning → Execution → Verification → Escalation） | ✅ |
 | OpenRouter + YAML Preset | ✅ |
 | Typer CLI | ✅ |
-| 檔案讀寫 / Shell 執行 | ❌ |
-| 沙箱隔離 | ❌ |
-| 安全 / 信任 / 審計 | ❌ |
+| Tool 基礎層（read/write/list/delete/run_command） | ✅ |
+| WorkspaceGuard 邊界防護 | ✅ |
+| `run_tests` + 結構化 pytest 報告 | ✅ |
+| Tool 呼叫追蹤與 `max_tool_calls` 上限 | ✅ |
+| Verification 讀取 tool 執行摘要 | ✅ |
+| Execution Crew 掛載 tools | ❌（v0.5） |
+| `council sandbox` CLI | ❌（v0.5） |
+| 安全 / 信任 / 審計 | ❌（v0.6+） |
 
-Execution Crew 目前僅產出文字交付物，Agent 未指派任何 tools。
+Tool 函式已實作並經單元／整合測試驗證；Orchestrator 可收集 tool 摘要傳至 Verification，但 Execution Crew 尚未掛載 tools，CLI 仍為純文字管線。
 
 ## 目標里程碑
 
