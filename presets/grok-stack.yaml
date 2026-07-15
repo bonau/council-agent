@@ -1,0 +1,16 @@
+name: grok-stack
+description: "Grok 4.5 企劃、DeepSeek V4 Flash 執行、Gemini 3.5 Flash 校驗、Grok 4.5 修疑難雜症"
+roles:
+  planning:
+    model: x-ai/grok-4.5
+    temperature: 0.3
+  execution:
+    model: deepseek/deepseek-v4-flash
+    temperature: 0.1
+  verification:
+    model: google/gemini-3.5-flash
+    temperature: 0.0
+  escalation:
+    model: x-ai/grok-4.5
+    temperature: 0.2
+max_retries: 1
