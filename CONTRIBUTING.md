@@ -1,5 +1,28 @@
 # Contributing to Council Agent
 
+## Development Methodology
+
+本專案採 **Spec-driven Development**，並以 [OpenSpec](https://github.com/Fission-AI/OpenSpec) 管理規格與變更。所有新功能、修正與重構，應先建立 OpenSpec change，對齊規格後再實作。
+
+### 工作流程
+
+1. **探索**（需求不明）→ `/opsx:explore`
+2. **提案** → `/opsx:propose "<change-name>"` 產生 proposal、design、tasks、spec delta
+3. **審閱** → 確認 artifacts 無誤
+4. **實作** → `/opsx:apply`，依 tasks.md 逐步完成
+5. **驗證** → `npx @fission-ai/openspec@latest validate --strict` 與 `uv run pytest`
+6. **歸檔** → `/opsx:archive` 將 delta 合併至 `openspec/specs/`
+
+### 環境需求
+
+OpenSpec CLI 需要 Node.js ≥ 20.19：
+
+```bash
+npx @fission-ai/openspec@latest --version
+```
+
+詳細說明見 [AGENTS.md](AGENTS.md)。
+
 ## Git Flow
 
 This project follows [git-flow](https://nvie.com/posts/a-successful-git-branching-model/):

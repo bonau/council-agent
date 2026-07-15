@@ -1,0 +1,27 @@
+---
+description: Spec-driven 開發流程，使用 OpenSpec 管理規格與變更
+alwaysApply: true
+---
+
+# Spec-driven + OpenSpec
+
+本專案所有功能開發、修正與重構，預設採 **Spec-driven Development**，並以 **OpenSpec** 管理。
+
+## 開始前
+
+1. 閱讀 `AGENTS.md` 與 `openspec/config.yaml` 的專案脈絡。
+2. 若需求尚不明確，使用 `/opsx:explore`。
+3. 若已清楚要做什麼，使用 `/opsx:propose "<change-name>"` 建立 change。
+
+## 實作時
+
+- 依 `openspec/changes/<name>/tasks.md` 逐步完成，不要跳過 spec 對齊。
+- 實作前確認 `proposal.md`、`design.md` 與 spec delta 已就緒。
+- 完成後執行 `/opsx:archive` 將 delta 合併至 `openspec/specs/`。
+
+## 驗證
+
+```bash
+npx @fission-ai/openspec@latest validate --strict
+uv run pytest
+```

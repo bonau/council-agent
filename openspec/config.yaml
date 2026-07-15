@@ -1,0 +1,23 @@
+schema: spec-driven
+
+context: |
+  Project: Council Agent — OpenRouter + CrewAI 三階段 CLI 框架
+  Tech stack: Python 3.11+, uv, CrewAI, Typer, Pydantic, pytest
+  Architecture: Planning → Execution → Verification → Escalation pipeline
+  Branching: git-flow (main / develop / feature/* / release/*)
+  Commits: conventional commits (feat, fix, docs, chore, test, refactor)
+  Testing: uv run pytest
+  Docs: README.md, ROADMAP.md, CONTRIBUTING.md, AGENTS.md
+  Development policy: Spec-driven Development with OpenSpec (see AGENTS.md)
+  Current version: v0.1.0 — text-only execution, no file/shell tools yet
+  Roadmap: Tool-First incremental (see ROADMAP.md for v0.2–v1.0 milestones)
+
+# Per-artifact rules (optional)
+# Add custom rules for specific artifacts.
+# Example:
+#   rules:
+#     proposal:
+#       - Keep proposals under 500 words
+#       - Always include a "Non-goals" section
+#     tasks:
+#       - Break tasks into chunks of max 2 hours
