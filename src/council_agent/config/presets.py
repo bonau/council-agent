@@ -18,6 +18,7 @@ class Preset(BaseModel):
     description: str
     roles: dict[str, RoleConfig]
     max_retries: int = Field(default=1, ge=0)
+    max_tool_calls: int | None = Field(default=None, ge=1)
 
     @property
     def planning(self) -> RoleConfig:
@@ -57,3 +58,12 @@ def get_preset_by_name(presets_dir: Path, name: str) -> Preset:
             f"Preset '{name}' not found. Available: {', '.join(available)}"
         )
     return load_preset(path)
+
+
+def get_effective_max_tool_calls(preset: Preset) -> int:
+    """Return preset override or global default from settings."""
+    if preset.max_tool_calls is not None:
+        return preset.max_tool_calls
+    from council_agent.config.settings import get_settings
+
+    return get_settings().max_tool_calls

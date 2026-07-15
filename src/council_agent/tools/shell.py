@@ -1,12 +1,53 @@
-"""Shell tools: run_command."""
+"""Shell tools: run_command, run_tests."""
 
 from __future__ import annotations
 
+import re
 import subprocess
+import sys
 import time
+from typing import Any
 
 from council_agent.sandbox.workspace import WorkspaceGuardError, get_workspace_guard
 from council_agent.tools.base import ToolResult, _err, _ok
+
+_SUMMARY_LINE = re.compile(
+    r"(?:(\d+)\s+passed)?(?:,\s*)?(?:(\d+)\s+failed)?(?:,\s*)?"
+    r"(?:(\d+)\s+skipped)?(?:,\s*)?(?:(\d+)\s+error)?",
+    re.IGNORECASE,
+)
+_FAILURE_LINE = re.compile(r"^(?:FAILED|E\s+).+", re.MULTILINE)
+
+
+def parse_pytest_output(combined: str, exit_code: int) -> dict[str, Any]:
+    """Extract passed/failed/skipped counts and failure summaries from pytest output."""
+    passed = failed = skipped = errors = 0
+    for match in _SUMMARY_LINE.finditer(combined):
+        if match.group(1) is not None:
+            passed = int(match.group(1))
+        if match.group(2) is not None:
+            failed = int(match.group(2))
+        if match.group(3) is not None:
+            skipped = int(match.group(3))
+        if match.group(4) is not None:
+            errors = int(match.group(4))
+
+    if exit_code != 0 and passed == 0 and failed == 0 and skipped == 0 and errors == 0:
+        failed = 1
+
+    failures = [
+        line.strip()
+        for line in _FAILURE_LINE.findall(combined)
+        if line.strip()
+    ]
+
+    return {
+        "exit_code": exit_code,
+        "passed": passed,
+        "failed": failed + errors,
+        "skipped": skipped,
+        "failures": failures,
+    }
 
 
 def run_command(
@@ -53,3 +94,46 @@ def run_command(
 
     error = stderr or f"Command exited with code {result.returncode}"
     return _err(error, output=stdout, **metadata)
+
+
+def run_tests(
+    path: str = ".",
+    args: str = "",
+    *,
+    timeout_sec: int = 120,
+) -> ToolResult:
+    try:
+        test_path = get_workspace_guard().resolve(path)
+    except WorkspaceGuardError as exc:
+        return _err(str(exc))
+
+    if not test_path.exists():
+        return _err(f"Test path does not exist: {path}")
+
+    cmd_parts = [
+        sys.executable,
+        "-m",
+        "pytest",
+        str(test_path),
+        "-q",
+        "--tb=line",
+    ]
+    if args.strip():
+        cmd_parts.extend(args.split())
+
+    command = " ".join(cmd_parts)
+    result = run_command(command, timeout_sec=timeout_sec)
+
+    combined = result.output
+    if result.error:
+        combined = f"{combined}\n{result.error}".strip()
+
+    exit_code = int(result.metadata.get("exit_code", 1))
+    parsed = parse_pytest_output(combined, exit_code)
+    metadata = {**result.metadata, **parsed}
+
+    if result.success:
+        return _ok(result.output, **metadata)
+
+    error = result.error or f"Tests failed with exit code {exit_code}"
+    return _err(error, output=result.output, **metadata)

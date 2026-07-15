@@ -26,4 +26,4 @@
 ## 6. Verification
 
 - [x] 6.1 Run `uv run pytest` — all tests pass including existing orchestrator/preset tests
-- [x] 6.2 Run `npx @fission-ai/openspec@latest validate --strict`
+- [x] 6.2 Run `npx @fission-ai/openspec@latest validate --changes --strict` and `validate --specs --strict`

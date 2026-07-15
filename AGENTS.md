@@ -51,6 +51,39 @@ openspec/
 - **測試**：Python 專案使用 `uv run pytest`；新功能應在 tasks 中列出對應測試項目。
 - **Roadmap**：版本規劃見 [ROADMAP.md](ROADMAP.md)；重大里程碑應先以 OpenSpec change 具體化再開發。
 
+## 套件地圖與模組邊界
+
+```
+src/council_agent/
+├── cli.py              # Typer CLI 入口；不直接呼叫 tools
+├── orchestrator.py     # 三階段管線協調；收集 tool_summaries 傳 Verification
+├── types.py            # Plan、ExecutionResult、ToolCallSummary 等共用型別
+├── config/
+│   ├── settings.py     # 環境變數（含 COUNCIL_MAX_TOOL_CALLS、workspace root）
+│   └── presets.py      # YAML preset 載入
+├── crews/              # CrewAI 各階段；v0.5 起 execution 掛載 tools
+│   ├── planning.py
+│   ├── execution.py
+│   └── verification.py # v0.4+ 接收 tool 執行摘要
+├── llm/
+│   └── openrouter.py   # OpenRouter LLM 工廠
+├── tools/              # 純 Python tool 函式；回傳 ToolResult，不 raise
+│   ├── base.py         # ToolResult
+│   ├── filesystem.py   # read/write/list/delete（經 WorkspaceGuard）
+│   ├── shell.py        # run_command、run_tests
+│   └── tracker.py      # ToolCallTracker、max_tool_calls
+└── sandbox/
+    └── workspace.py    # WorkspaceGuard 邊界驗證
+```
+
+**邊界原則**
+
+- `tools/` 為可重用函式層，**不**依賴 CrewAI；預期錯誤回傳 `ToolResult`，不 throw。
+- `sandbox/` 提供邊界驗證；所有 filesystem / shell tool 在入口呼叫 `WorkspaceGuard`。
+- `orchestrator.py` 串接 crews 與 tool 摘要；**不**在 CLI 層實作業務邏輯。
+- `crews/execution.py` 目前**未**掛載 tools（v0.5 sandbox-mvp 負責整合）。
+- `security/` 目錄尚未建立；v0.6+ 依 ROADMAP 新增 policy / audit / trust。
+
 ## 不應做的事
 
 - 未建立 change 就直接大規模改動行為或 API。
