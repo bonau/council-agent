@@ -25,6 +25,7 @@ class Settings(BaseSettings):
         default_factory=Path.cwd,
         alias="COUNCIL_WORKSPACE_ROOT",
     )
+    max_tool_calls: int = Field(50, alias="COUNCIL_MAX_TOOL_CALLS", ge=1)
     presets_dir: Path = Field(default=PRESETS_DIR)
 
 
