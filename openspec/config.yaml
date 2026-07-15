@@ -9,8 +9,8 @@ context: |
   Testing: uv run pytest
   Docs: README.md, ROADMAP.md, CONTRIBUTING.md, AGENTS.md
   Development policy: Spec-driven Development with OpenSpec (see AGENTS.md)
-  Current version: v0.4.0 — run_tests, tool call tracking, verification summaries
-  Capabilities: tools (filesystem, shell, run_tests), sandbox (WorkspaceGuard), orchestration (tracker, max_tool_calls)
+  Current version: v0.5.0 — sandbox MVP, CrewAI tools on Execution Crew, session recording
+  Capabilities: tools (filesystem, shell, run_tests, CrewAI wrappers), sandbox (WorkspaceGuard, session, CLI), orchestration (tracker, max_tool_calls, auto summaries)
 
 rules:
   proposal:
