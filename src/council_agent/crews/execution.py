@@ -1,4 +1,4 @@
-"""Execution crew: carry out the plan."""
+"""Execution crew: carry out the plan using workspace tools when available."""
 
 from __future__ import annotations
 
@@ -6,12 +6,16 @@ from crewai import Agent, Crew, Process, Task
 
 from council_agent.config.presets import Preset
 from council_agent.crews.base import crew_output_text
+from council_agent.crews.execution_tools import build_execution_tools
 from council_agent.llm.openrouter import make_llm
+from council_agent.sandbox.session import SessionManager
+from council_agent.tools import ToolCallTracker
 from council_agent.types import ExecutionResult, PlanArtifact
 
 EXECUTION_BACKSTORY = (
-    "You are a focused executor. Follow the plan precisely, produce concrete "
-    "deliverables, and explain your reasoning clearly."
+    "You are a focused executor. Follow the plan precisely, use the available "
+    "workspace tools to create or modify files and run commands/tests when needed, "
+    "produce concrete deliverables, and explain your reasoning clearly."
 )
 
 EXECUTION_TASK_DESCRIPTION = """
@@ -26,7 +30,9 @@ Plan steps:
 Success criteria:
 {success_criteria}
 
-Produce the complete deliverable. Be thorough and address every step.
+Use workspace tools (read_file, write_file, list_dir, delete_file, run_command,
+run_tests) when the task requires real file or shell operations. Produce the
+complete deliverable and address every step.
 """
 
 
@@ -36,13 +42,24 @@ def _format_plan_sections(plan: PlanArtifact) -> dict[str, str]:
     return {"steps": steps, "success_criteria": criteria}
 
 
-def build_execution_crew(preset: Preset, api_key: str) -> Crew:
+def build_execution_crew(
+    preset: Preset,
+    api_key: str,
+    *,
+    tracker: ToolCallTracker | None = None,
+    session: SessionManager | None = None,
+) -> Crew:
+    tools = []
+    if tracker is not None:
+        tools = build_execution_tools(tracker, session=session)
+
     role = preset.execution
     agent = Agent(
         role="Task Executor",
         goal="Execute the plan and produce a complete deliverable",
         backstory=EXECUTION_BACKSTORY,
         llm=make_llm(role.model, role.temperature, api_key),
+        tools=tools,
         verbose=False,
     )
     task = Task(
@@ -53,7 +70,13 @@ def build_execution_crew(preset: Preset, api_key: str) -> Crew:
     return Crew(agents=[agent], tasks=[task], process=Process.sequential, verbose=False)
 
 
-def run_execution(crew: Crew, prompt: str, plan: PlanArtifact) -> ExecutionResult:
+def run_execution(
+    crew: Crew,
+    prompt: str,
+    plan: PlanArtifact,
+    *,
+    tracker: ToolCallTracker | None = None,
+) -> ExecutionResult:
     sections = _format_plan_sections(plan)
     result = crew.kickoff(
         inputs={
@@ -62,4 +85,5 @@ def run_execution(crew: Crew, prompt: str, plan: PlanArtifact) -> ExecutionResul
             "success_criteria": sections["success_criteria"],
         }
     )
-    return ExecutionResult(raw=crew_output_text(result))
+    summaries = list(tracker.summaries) if tracker is not None else []
+    return ExecutionResult(raw=crew_output_text(result), tool_summaries=summaries)

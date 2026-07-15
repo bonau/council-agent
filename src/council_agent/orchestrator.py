@@ -2,14 +2,20 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
 from crewai import Agent, Crew, Process, Task
 
-from council_agent.config.presets import Preset
+from council_agent.config.presets import Preset, get_effective_max_tool_calls
+from council_agent.config.settings import get_settings
+from council_agent.crews.base import crew_output_text
 from council_agent.crews.execution import build_execution_crew, run_execution
 from council_agent.crews.planning import build_planning_crew, run_planning
 from council_agent.crews.verification import build_verification_crew, run_verification
-from council_agent.crews.base import crew_output_text
 from council_agent.llm.openrouter import make_llm
+from council_agent.sandbox.config import is_sandbox_initialized
+from council_agent.sandbox.session import SessionManager
+from council_agent.tools import ToolCallTracker
 from council_agent.types import (
     CouncilResult,
     ExecutionResult,
@@ -54,6 +60,25 @@ def _format_issues(verdict: VerificationVerdict) -> str:
     return "\n".join(f"- {i}" for i in verdict.issues) or "- (none listed)"
 
 
+def _resolve_session_project(
+    workspace_root: Path,
+    project_root: Path | None,
+) -> Path | None:
+    """Return a project root that has `.council/`, or None if sandbox is inactive."""
+    candidates: list[Path] = []
+    if project_root is not None:
+        candidates.append(Path(project_root).expanduser().resolve())
+    candidates.append(Path(workspace_root).expanduser().resolve())
+    cwd = Path.cwd().resolve()
+    if cwd not in candidates:
+        candidates.append(cwd)
+
+    for candidate in candidates:
+        if is_sandbox_initialized(candidate):
+            return candidate
+    return None
+
+
 def build_escalation_crew(preset: Preset, api_key: str) -> Crew:
     role = preset.escalation
     agent = Agent(
@@ -96,10 +121,34 @@ def run_council(
     api_key: str,
     *,
     verbose: bool = False,
+    project_root: Path | str | None = None,
 ) -> CouncilResult:
     """Run the full three-phase council pipeline with optional escalation."""
+    settings = get_settings()
+    workspace_root = Path(settings.council_workspace_root).resolve()
+    session_project = _resolve_session_project(
+        workspace_root,
+        Path(project_root) if project_root is not None else None,
+    )
+
+    session: SessionManager | None = None
+    if session_project is not None:
+        session = SessionManager.create(
+            prompt=prompt,
+            preset=preset.name,
+            workspace_root=workspace_root,
+            project_root=session_project,
+        )
+
+    tracker = ToolCallTracker(max_tool_calls=get_effective_max_tool_calls(preset))
+
     planning_crew = build_planning_crew(preset, api_key)
-    execution_crew = build_execution_crew(preset, api_key)
+    execution_crew = build_execution_crew(
+        preset,
+        api_key,
+        tracker=tracker,
+        session=session,
+    )
     verification_crew = build_verification_crew(preset, api_key)
 
     if verbose:
@@ -107,28 +156,42 @@ def run_council(
         execution_crew.verbose = True
         verification_crew.verbose = True
 
-    plan = run_planning(planning_crew, prompt)
-    execution = run_execution(execution_crew, prompt, plan)
-    verdict = run_verification(verification_crew, prompt, plan, execution)
-
-    escalated = False
-    final_output = execution.raw
-
-    if verdict.status == VerdictStatus.FAIL and preset.max_retries > 0:
-        escalation_crew = build_escalation_crew(preset, api_key)
-        if verbose:
-            escalation_crew.verbose = True
-        execution = run_escalation(
-            escalation_crew, prompt, plan, execution, verdict
+    session_status = "completed"
+    try:
+        plan = run_planning(planning_crew, prompt)
+        execution = run_execution(
+            execution_crew, prompt, plan, tracker=tracker
         )
-        escalated = True
+        verdict = run_verification(verification_crew, prompt, plan, execution)
+
+        escalated = False
         final_output = execution.raw
 
-    return CouncilResult(
-        prompt=prompt,
-        plan=plan,
-        execution=execution,
-        verdict=verdict,
-        escalated=escalated,
-        final_output=final_output,
-    )
+        if verdict.status == VerdictStatus.FAIL and preset.max_retries > 0:
+            escalation_crew = build_escalation_crew(preset, api_key)
+            if verbose:
+                escalation_crew.verbose = True
+            execution = run_escalation(
+                escalation_crew, prompt, plan, execution, verdict
+            )
+            escalated = True
+            final_output = execution.raw
+
+        return CouncilResult(
+            prompt=prompt,
+            plan=plan,
+            execution=execution,
+            verdict=verdict,
+            escalated=escalated,
+            final_output=final_output,
+        )
+    except Exception:
+        session_status = "failed"
+        raise
+    finally:
+        if session is not None:
+            # Keep count in sync if tools logged via tracker but finalize late.
+            session.meta.tool_call_count = max(
+                session.meta.tool_call_count, len(tracker.summaries)
+            )
+            session.finalize(status=session_status)
