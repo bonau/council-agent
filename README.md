@@ -61,11 +61,16 @@ uv run council run "設計 REST API 規格" -p grok-stack --verbose
 
 ## 開發
 
+本專案採 **Spec-driven Development**，以 [OpenSpec](https://github.com/Fission-AI/OpenSpec) 管理規格與變更。新功能或修正應先建立 OpenSpec change，對齊規格後再實作。
+
 ```bash
 uv run pytest
+npx @fission-ai/openspec@latest status   # 查看 OpenSpec 變更狀態
 ```
 
-分支策略與 commit 規範見 [CONTRIBUTING.md](CONTRIBUTING.md)。
+- [AGENTS.md](AGENTS.md) — AI 協作與 OpenSpec 工作流程
+- [CONTRIBUTING.md](CONTRIBUTING.md) — Git Flow 與 commit 規範
+- [ROADMAP.md](ROADMAP.md) — 版本路線圖
 
 ## 架構
 
