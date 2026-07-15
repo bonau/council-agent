@@ -9,6 +9,7 @@ import time
 from typing import Any
 
 from council_agent.sandbox.workspace import WorkspaceGuardError, get_workspace_guard
+from council_agent.security import CommandCategory, classify_command
 from council_agent.tools.base import ToolResult, _err, _ok
 
 _SUMMARY_LINE = re.compile(
@@ -61,6 +62,22 @@ def run_command(
     except WorkspaceGuardError as exc:
         return _err(str(exc))
 
+    if not command or not command.strip():
+        return _err("Empty command")
+
+    classification = classify_command(command)
+    if classification.category is CommandCategory.DANGEROUS:
+        rule = classification.matched_rule or "unknown"
+        return _err(
+            f"Command classified as dangerous (matched: {rule}); refused",
+            classification=classification.category.value,
+            matched_rule=classification.matched_rule,
+        )
+
+    class_meta = {"classification": classification.category.value}
+    if classification.matched_rule is not None:
+        class_meta["matched_rule"] = classification.matched_rule
+
     start = time.monotonic()
     try:
         result = subprocess.run(
@@ -76,10 +93,11 @@ def run_command(
         return _err(
             f"Command timed out after {timeout_sec}s",
             duration_ms=duration_ms,
+            **class_meta,
         )
     except OSError as exc:
         duration_ms = int((time.monotonic() - start) * 1000)
-        return _err(str(exc), duration_ms=duration_ms)
+        return _err(str(exc), duration_ms=duration_ms, **class_meta)
 
     duration_ms = int((time.monotonic() - start) * 1000)
     stdout = result.stdout
@@ -87,7 +105,11 @@ def run_command(
         stdout = stdout[:-1]
 
     stderr = result.stderr.strip() if result.stderr else None
-    metadata = {"exit_code": result.returncode, "duration_ms": duration_ms}
+    metadata = {
+        "exit_code": result.returncode,
+        "duration_ms": duration_ms,
+        **class_meta,
+    }
 
     if result.returncode == 0:
         return _ok(stdout, **metadata)

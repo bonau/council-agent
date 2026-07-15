@@ -11,11 +11,12 @@ OpenRouter + CrewAI 三階段 CLI 框架：每次推論依序經過 **計劃 →
 - Tool 基礎層：`read_file`、`write_file`、`list_dir`、`delete_file`、`run_command`、`run_tests`
 - Execution Crew 掛載上述 tools，可在工作區內實際改檔與跑測試
 - `WorkspaceGuard` 限制檔案與 shell 操作在工作區內
+- 指令分類：危險 shell 指令（`sudo` / `curl` / `rm -rf` 等）在 `run_command` 執行前拒絕
 - Tool 呼叫追蹤與 `max_tool_calls` 上限（預設 50）
 - Verification 可接收結構化 tool 執行摘要（含 pytest 結果）
 - 可選 `.council/` sandbox：session 紀錄（`meta.json` + `tools.jsonl`）
 
-> **安全提示**：`run_command` 使用 `shell=True` 執行指令，且 v0.5 **尚無**指令分類或互動確認。請僅在信任的專案目錄使用，並避免將不受信任的 prompt 直接餵給 Agent。完整安全機制（指令分類、信任階梯、審計）規劃見 [ROADMAP.md](ROADMAP.md) v0.6+。
+> **安全提示**：`run_command` 使用 `shell=True`。v0.6 起會以 **指令分類**（`read` / `write` / `dangerous`）在執行前拒絕明顯危險指令（如 `sudo`、`curl`、`rm -rf`），但這是 pattern 啟發式，**不是**完整信任框架（尚無互動確認、政策檔、Trust Tier、審計）。請僅在信任的專案目錄使用，並避免將不受信任的 prompt 直接餵給 Agent。後續規劃見 [ROADMAP.md](ROADMAP.md) v0.7+。
 
 ## Presets
 
