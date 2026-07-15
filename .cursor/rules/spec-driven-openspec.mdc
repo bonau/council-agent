@@ -22,6 +22,7 @@ alwaysApply: true
 ## 驗證
 
 ```bash
-npx @fission-ai/openspec@latest validate --strict
+npx @fission-ai/openspec@latest validate --changes --strict
+npx @fission-ai/openspec@latest validate --specs --strict
 uv run pytest
 ```

@@ -49,3 +49,6 @@ htmlcov/
 # OS
 .DS_Store
 Thumbs.db
+
+# Council workspace sessions (v0.5+)
+.council/sessions/

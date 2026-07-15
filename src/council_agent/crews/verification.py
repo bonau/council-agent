@@ -12,6 +12,7 @@ from council_agent.llm.openrouter import make_llm
 from council_agent.types import (
     ExecutionResult,
     PlanArtifact,
+    ToolCallSummary,
     VerdictStatus,
     VerificationVerdict,
 )
@@ -36,6 +37,17 @@ Success criteria:
 Execution result:
 {execution}
 
+Tool execution summaries (if any):
+{tool_summaries}
+
+When tool summaries include test results (run_tests), you MUST compare:
+- test exit code (metadata.exit_code): 0 means tests passed
+- passed / failed / skipped counts against the success criteria
+- failure summaries in metadata.failures
+
+If tests failed (non-zero exit code or failed > 0), status should be FAIL unless
+the success criteria explicitly allow partial failure.
+
 Respond with a JSON object only (no extra text) using this schema:
 {{
   "status": "PASS" or "FAIL",
@@ -43,6 +55,26 @@ Respond with a JSON object only (no extra text) using this schema:
   "issues": ["issue 1", ...]
 }}
 """
+
+
+def _format_tool_summaries(summaries: list[ToolCallSummary]) -> str:
+    if not summaries:
+        return "- (no tool calls recorded)"
+    lines: list[str] = []
+    for s in summaries:
+        meta = s.metadata
+        parts = [f"- {s.tool}: success={s.success}"]
+        if "exit_code" in meta:
+            parts.append(f"exit_code={meta['exit_code']}")
+        for key in ("passed", "failed", "skipped"):
+            if key in meta:
+                parts.append(f"{key}={meta[key]}")
+        if meta.get("failures"):
+            parts.append(f"failures={meta['failures']}")
+        if s.error:
+            parts.append(f"error={s.error!r}")
+        lines.append(", ".join(parts))
+    return "\n".join(lines)
 
 
 def build_verification_crew(preset: Preset, api_key: str) -> Crew:
@@ -70,12 +102,14 @@ def run_verification(
 ) -> VerificationVerdict:
     steps = "\n".join(f"- {s}" for s in plan.steps) or "- (no steps)"
     criteria = "\n".join(f"- {c}" for c in plan.success_criteria) or "- (none)"
+    summaries = execution.tool_summaries or []
     result = crew.kickoff(
         inputs={
             "prompt": prompt,
             "steps": steps,
             "success_criteria": criteria,
             "execution": execution.raw,
+            "tool_summaries": _format_tool_summaries(summaries),
         }
     )
     raw = crew_output_text(result)
