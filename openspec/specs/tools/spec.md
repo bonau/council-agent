@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Reusable file system and shell tool functions that return a unified `ToolResult` structure. Introduced in v0.2 as a foundation layer for WorkspaceGuard (v0.3) and CrewAI integration (v0.5).
+Reusable file system and shell tool functions that return a unified `ToolResult` structure. Introduced in v0.2 as a foundation layer; v0.3 adds WorkspaceGuard boundary enforcement. CrewAI integration planned for v0.5.
 
 ## Requirements
 
@@ -124,11 +124,35 @@ Tool functions SHALL exist as standalone Python functions and SHALL NOT be mount
 - **WHEN** the tools module is imported
 - **THEN** no changes are required to `execution.py`, `orchestrator.py`, or `cli.py`
 
-### Requirement: No workspace boundary enforcement
+### Requirement: Workspace boundary enforcement on filesystem tools
 
-Tool functions SHALL accept relative or absolute paths without workspace root validation in this version.
+All filesystem tool functions (`read_file`, `write_file`, `list_dir`, `delete_file`) SHALL validate the `path` argument via `WorkspaceGuard.resolve()` before performing any file operation. When validation fails, they SHALL return `ToolResult(success=False, error=<message>)` without raising.
 
-#### Scenario: Path without guard
+#### Scenario: Filesystem tool rejects path outside workspace
 
-- **WHEN** `read_file` is called with any resolvable path
-- **THEN** the file is read without workspace boundary checks
+- **WHEN** `read_file` is called with a path that resolves outside the workspace root
+- **THEN** it returns `success=False` with an error message about workspace boundary
+
+#### Scenario: Filesystem tool rejects denied path
+
+- **WHEN** `read_file` is called with path `.env`
+- **THEN** it returns `success=False` with an error message about denied path
+
+#### Scenario: Filesystem tool allows valid workspace path
+
+- **WHEN** `write_file` is called with a path inside the workspace and not denied
+- **THEN** it proceeds with the write operation as before
+
+### Requirement: Workspace boundary enforcement on run_command
+
+The `run_command` tool SHALL validate the `cwd` argument via `WorkspaceGuard.resolve_cwd()` before executing. When `cwd` is `None`, the command SHALL execute with workspace root as working directory.
+
+#### Scenario: run_command rejects cwd outside workspace
+
+- **WHEN** `run_command` is called with `cwd` pointing outside the workspace root
+- **THEN** it returns `success=False` with an error message about workspace boundary
+
+#### Scenario: run_command defaults to workspace root
+
+- **WHEN** `run_command` is called without `cwd`
+- **THEN** the command executes with workspace root as the working directory

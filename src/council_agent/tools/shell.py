@@ -5,6 +5,7 @@ from __future__ import annotations
 import subprocess
 import time
 
+from council_agent.sandbox.workspace import WorkspaceGuardError, get_workspace_guard
 from council_agent.tools.base import ToolResult, _err, _ok
 
 
@@ -14,6 +15,11 @@ def run_command(
     *,
     timeout_sec: int = 120,
 ) -> ToolResult:
+    try:
+        workdir = get_workspace_guard().resolve_cwd(cwd)
+    except WorkspaceGuardError as exc:
+        return _err(str(exc))
+
     start = time.monotonic()
     try:
         result = subprocess.run(
@@ -21,7 +27,7 @@ def run_command(
             shell=True,
             capture_output=True,
             text=True,
-            cwd=cwd,
+            cwd=str(workdir),
             timeout=timeout_sec,
         )
     except subprocess.TimeoutExpired:

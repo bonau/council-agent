@@ -4,13 +4,17 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from council_agent.sandbox.workspace import WorkspaceGuardError, get_workspace_guard
 from council_agent.tools.base import ToolResult, _err, _ok
 
 _ENCODING = "utf-8"
 
 
 def read_file(path: str) -> ToolResult:
-    target = Path(path)
+    try:
+        target = get_workspace_guard().resolve(path)
+    except WorkspaceGuardError as exc:
+        return _err(str(exc))
     try:
         if not target.exists():
             return _err(f"File not found: {path}")
@@ -26,7 +30,10 @@ def read_file(path: str) -> ToolResult:
 
 
 def write_file(path: str, content: str) -> ToolResult:
-    target = Path(path)
+    try:
+        target = get_workspace_guard().resolve(path)
+    except WorkspaceGuardError as exc:
+        return _err(str(exc))
     try:
         created = not target.exists()
         target.parent.mkdir(parents=True, exist_ok=True)
@@ -40,7 +47,10 @@ def write_file(path: str, content: str) -> ToolResult:
 
 
 def list_dir(path: str) -> ToolResult:
-    target = Path(path)
+    try:
+        target = get_workspace_guard().resolve(path)
+    except WorkspaceGuardError as exc:
+        return _err(str(exc))
     try:
         if not target.exists():
             return _err(f"Directory not found: {path}")
@@ -56,7 +66,10 @@ def list_dir(path: str) -> ToolResult:
 
 
 def delete_file(path: str) -> ToolResult:
-    target = Path(path)
+    try:
+        target = get_workspace_guard().resolve(path)
+    except WorkspaceGuardError as exc:
+        return _err(str(exc))
     try:
         if not target.exists():
             return _err(f"File not found: {path}")

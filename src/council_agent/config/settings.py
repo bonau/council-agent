@@ -21,6 +21,10 @@ class Settings(BaseSettings):
 
     openrouter_api_key: str = Field(..., alias="OPENROUTER_API_KEY")
     council_default_preset: str = Field("glm-stack", alias="COUNCIL_DEFAULT_PRESET")
+    council_workspace_root: Path = Field(
+        default_factory=Path.cwd,
+        alias="COUNCIL_WORKSPACE_ROOT",
+    )
     presets_dir: Path = Field(default=PRESETS_DIR)
 
 
