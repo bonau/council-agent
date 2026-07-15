@@ -6,14 +6,16 @@ OpenRouter + CrewAI 三階段 CLI 框架：每次推論依序經過 **計劃 →
 
 - 三階段 Crew 管線（Planning / Execution / Verification）
 - 內建兩組模型 Preset，全部透過 OpenRouter 路由
-- Typer CLI 介面，支援 `--verbose` 顯示各階段輸出
+- Typer CLI 介面，支援 `--verbose`、`--workspace` 與 `council sandbox` 子命令
 - 校驗失敗時自動 escalation（可設定 `max_retries`）
 - Tool 基礎層：`read_file`、`write_file`、`list_dir`、`delete_file`、`run_command`、`run_tests`
+- Execution Crew 掛載上述 tools，可在工作區內實際改檔與跑測試
 - `WorkspaceGuard` 限制檔案與 shell 操作在工作區內
 - Tool 呼叫追蹤與 `max_tool_calls` 上限（預設 50）
 - Verification 可接收結構化 tool 執行摘要（含 pytest 結果）
+- 可選 `.council/` sandbox：session 紀錄（`meta.json` + `tools.jsonl`）
 
-> **安全提示**：`run_command` 使用 `shell=True` 執行指令。請僅在信任的專案目錄使用，並避免將不受信任的 prompt 直接餵給 Agent。完整安全機制（指令分類、信任階梯、審計）規劃見 [ROADMAP.md](ROADMAP.md) v0.6+。
+> **安全提示**：`run_command` 使用 `shell=True` 執行指令，且 v0.5 **尚無**指令分類或互動確認。請僅在信任的專案目錄使用，並避免將不受信任的 prompt 直接餵給 Agent。完整安全機制（指令分類、信任階梯、審計）規劃見 [ROADMAP.md](ROADMAP.md) v0.6+。
 
 ## Presets
 
@@ -57,6 +59,24 @@ uv run council run "用 Python 寫一個 FizzBuzz 函式"
 # 指定 preset 並顯示各階段輸出
 uv run council run "設計 REST API 規格" -p grok-stack --verbose
 ```
+
+### Sandbox 工作流程
+
+在專案目錄初始化後，Execution Crew 會掛載 tools；有 `.council/` 時每次 `run` 會寫入 session。
+
+```bash
+# 在目前專案目錄初始化 sandbox（idempotent，不刪既有 sessions）
+uv run council sandbox init
+
+# 帶 tools 執行完整管線（可覆寫工作區根目錄）
+uv run council run "為 utils.py 補上測試並確保 pytest 通過" --verbose
+uv run council run "整理 README" --workspace /path/to/project
+
+# 查看工作區與最近 session 摘要
+uv run council sandbox status
+```
+
+Workspace 解析順序：`--workspace` > `.council/config.yaml` > `COUNCIL_WORKSPACE_ROOT` > 目前工作目錄。未初始化 sandbox 時管線仍可執行（向後相容），只是不會寫入 session 檔。
 
 ## 環境變數
 

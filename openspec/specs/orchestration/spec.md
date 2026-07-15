@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Pipeline coordination for tool call tracking, limits, and passing structured execution summaries to Verification. Introduced in v0.4 alongside `run_tests` and the upgraded verification prompt.
+Pipeline coordination for tool call tracking, limits, session persistence, and passing structured execution summaries to Verification. Introduced in v0.4 alongside `run_tests`; v0.5 adds automatic tracker mounting and optional sandbox sessions.
 
 ## Requirements
 
@@ -47,3 +47,26 @@ The system SHALL support `max_tool_calls` via environment variable `COUNCIL_MAX_
 
 - **WHEN** a preset defines `max_tool_calls`
 - **THEN** that value is used instead of the global default
+
+### Requirement: Orchestrator creates session per run
+
+When sandbox is initialized, the orchestrator SHALL create a session before execution and finalize session metadata after the run completes (success or failure).
+
+#### Scenario: Run with sandbox creates session
+
+- **WHEN** `council run` executes with `.council/` present
+- **THEN** a new session directory is created and referenced for the duration of the run
+
+#### Scenario: Run without sandbox skips session files
+
+- **WHEN** `council run` executes without `.council/`
+- **THEN** the pipeline runs without writing session files (backward compatible)
+
+### Requirement: Execution phase populates tool summaries automatically
+
+During execution, the orchestrator SHALL attach a `ToolCallTracker` to Execution Crew tools so that `ExecutionResult.tool_summaries` is populated automatically without manual injection.
+
+#### Scenario: Summaries after execution
+
+- **WHEN** the Execution Crew completes after invoking tools
+- **THEN** `ExecutionResult.tool_summaries` contains one entry per recorded tool call

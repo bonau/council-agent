@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Reusable file system and shell tool functions that return a unified `ToolResult` structure. Introduced in v0.2 as a foundation layer; v0.3 adds WorkspaceGuard boundary enforcement; v0.4 adds `run_tests` with structured pytest reports. CrewAI integration planned for v0.5.
+Reusable file system and shell tool functions that return a unified `ToolResult` structure. Introduced in v0.2 as a foundation layer; v0.3 adds WorkspaceGuard boundary enforcement; v0.4 adds `run_tests` with structured pytest reports; v0.5 mounts CrewAI `@tool` wrappers on the Execution Crew.
 
 ## Requirements
 
@@ -139,14 +139,19 @@ The system SHALL provide `run_tests(path: str = ".", args: str = "", *, timeout_
 - **WHEN** `run_tests` is called with additional `args` (e.g. `-k test_foo`)
 - **THEN** those arguments are passed to pytest
 
-### Requirement: Tools are not integrated with Execution Crew
+### Requirement: CrewAI tool wrappers for Execution Crew
 
-Tool functions SHALL exist as standalone Python functions and SHALL NOT be mounted to CrewAI agents in this version.
+The system SHALL expose CrewAI-compatible tools for `read_file`, `write_file`, `list_dir`, `delete_file`, `run_command`, and `run_tests`. Each wrapper SHALL invoke the corresponding standalone function and return a string summary suitable for the agent. Wrappers SHALL route invocations through `ToolCallTracker.record()`.
 
-#### Scenario: No crew integration
+#### Scenario: Execution agent invokes read_file
 
-- **WHEN** the tools module is imported
-- **THEN** no changes are required to `execution.py`, `orchestrator.py`, or `cli.py`
+- **WHEN** the Execution Crew agent calls the read_file tool with a valid workspace path
+- **THEN** the underlying `read_file` function runs and the tracker records the invocation
+
+#### Scenario: Tracker limit stops further tools
+
+- **WHEN** `max_tool_calls` has been reached
+- **THEN** subsequent tool wrapper calls return a limit-reached message without executing the underlying function
 
 ### Requirement: Workspace boundary enforcement on filesystem tools
 
