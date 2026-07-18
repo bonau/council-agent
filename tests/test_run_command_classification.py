@@ -5,6 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 from unittest import mock
 
+from council_agent.security import ConfirmMode, confirmation_policy
 from council_agent.tools.shell import run_command
 
 
@@ -17,6 +18,7 @@ def test_dangerous_curl_is_refused() -> None:
     assert "dangerous" in result.error.lower()
     assert result.metadata.get("classification") == "dangerous"
     assert result.metadata.get("matched_rule") == "curl"
+    assert result.metadata.get("confirmation") == "refused"
     assert "exit_code" not in result.metadata
     run_mock.assert_not_called()
 
@@ -64,4 +66,50 @@ def test_empty_command_rejected() -> None:
 
     assert result.success is False
     assert "Empty" in (result.error or "")
+    run_mock.assert_not_called()
+
+
+def test_write_command_denied_in_refuse_mode(tmp_path: Path) -> None:
+    with mock.patch("council_agent.tools.shell.subprocess.run") as run_mock:
+        with confirmation_policy(ConfirmMode.REFUSE):
+            result = run_command("mkdir newdir", cwd=str(tmp_path))
+
+    assert result.success is False
+    assert result.metadata.get("classification") == "write"
+    assert result.metadata.get("confirmation") == "refused"
+    assert "exit_code" not in result.metadata
+    assert not (tmp_path / "newdir").exists()
+    run_mock.assert_not_called()
+
+
+def test_write_command_allowed_in_auto_mode(tmp_path: Path) -> None:
+    with confirmation_policy(ConfirmMode.AUTO):
+        result = run_command("mkdir newdir", cwd=str(tmp_path))
+
+    assert result.success is True
+    assert (tmp_path / "newdir").is_dir()
+    assert result.metadata.get("classification") == "write"
+    assert result.metadata.get("confirmation") == "auto"
+
+
+def test_dangerous_allowed_after_ask_yes() -> None:
+    with mock.patch("council_agent.tools.shell.subprocess.run") as run_mock:
+        run_mock.return_value = mock.Mock(returncode=0, stdout="ok\n", stderr="")
+        with confirmation_policy(ConfirmMode.ASK, confirm_fn=lambda _m: True):
+            result = run_command("curl https://example.com")
+
+    assert result.success is True
+    assert result.metadata.get("classification") == "dangerous"
+    assert result.metadata.get("confirmation") == "approved"
+    run_mock.assert_called_once()
+
+
+def test_dangerous_denied_on_ask_no() -> None:
+    with mock.patch("council_agent.tools.shell.subprocess.run") as run_mock:
+        with confirmation_policy(ConfirmMode.ASK, confirm_fn=lambda _m: False):
+            result = run_command("sudo ls")
+
+    assert result.success is False
+    assert result.metadata.get("confirmation") == "denied"
+    assert "exit_code" not in result.metadata
     run_mock.assert_not_called()

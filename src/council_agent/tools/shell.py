@@ -9,7 +9,7 @@ import time
 from typing import Any
 
 from council_agent.sandbox.workspace import WorkspaceGuardError, get_workspace_guard
-from council_agent.security import CommandCategory, classify_command
+from council_agent.security import ActionKind, CommandCategory, classify_command, require_confirmation
 from council_agent.tools.base import ToolResult, _err, _ok
 
 _SUMMARY_LINE = re.compile(
@@ -66,17 +66,28 @@ def run_command(
         return _err("Empty command")
 
     classification = classify_command(command)
-    if classification.category is CommandCategory.DANGEROUS:
-        rule = classification.matched_rule or "unknown"
-        return _err(
-            f"Command classified as dangerous (matched: {rule}); refused",
-            classification=classification.category.value,
-            matched_rule=classification.matched_rule,
-        )
-
-    class_meta = {"classification": classification.category.value}
+    class_meta: dict[str, Any] = {"classification": classification.category.value}
     if classification.matched_rule is not None:
         class_meta["matched_rule"] = classification.matched_rule
+
+    gate_kind: ActionKind | None = None
+    if classification.category is CommandCategory.DANGEROUS:
+        gate_kind = ActionKind.DANGEROUS_SHELL
+    elif classification.category is CommandCategory.WRITE:
+        gate_kind = ActionKind.WRITE_SHELL
+
+    if gate_kind is not None:
+        decision = require_confirmation(gate_kind, command)
+        if decision.outcome.value != "compat_allow":
+            class_meta["confirmation"] = decision.outcome.value
+        if not decision.allowed:
+            rule = classification.matched_rule or "unknown"
+            label = classification.category.value
+            return _err(
+                f"Command classified as {label} (matched: {rule}); "
+                f"confirmation {decision.outcome.value}",
+                **class_meta,
+            )
 
     start = time.monotonic()
     try:

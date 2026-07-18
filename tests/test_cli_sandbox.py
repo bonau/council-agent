@@ -135,3 +135,34 @@ def test_run_workspace_flag_applies_root(
     assert get_workspace_guard().root == project.resolve()
     assert "Workspace" in result.output
     assert project.name in result.output
+    # CliRunner stdin is not a TTY → refuse unless --yes
+    assert mock_run.call_args.kwargs.get("confirm_mode").value == "refuse"
+
+
+def test_run_yes_flag_passes_auto_confirm_mode(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("OPENROUTER_API_KEY", "test-key")
+    get_settings.cache_clear()
+
+    fake = CouncilResult(
+        prompt="hi",
+        plan=PlanArtifact(raw="{}", steps=[], success_criteria=[], risks=[]),
+        execution=ExecutionResult(raw="done"),
+        verdict=VerificationVerdict(
+            status=VerdictStatus.PASS,
+            raw="{}",
+            issues=[],
+            summary="ok",
+        ),
+        escalated=False,
+        final_output="done",
+    )
+
+    with patch("council_agent.cli.run_council", return_value=fake) as mock_run:
+        result = runner.invoke(app, ["run", "hi", "--yes"])
+
+    assert result.exit_code == 0, result.output
+    assert mock_run.call_args.kwargs.get("confirm_mode").value == "auto"
+    assert "Confirm" in result.output
+    assert "auto" in result.output
