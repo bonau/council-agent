@@ -101,10 +101,12 @@ src/council_agent/
 ├── tools/              # 純 Python tool 函式；回傳 ToolResult
 │   ├── base.py         # ToolResult
 │   ├── filesystem.py   # read/write/list/delete（經 WorkspaceGuard）
-│   ├── shell.py        # run_command、run_tests
+│   ├── shell.py        # run_command、run_tests（經指令分類）
 │   └── tracker.py      # ToolCallTracker、max_tool_calls
-└── sandbox/
-    └── workspace.py    # WorkspaceGuard 邊界驗證
+├── sandbox/
+│   └── workspace.py    # WorkspaceGuard 邊界驗證
+└── security/           # v0.6+ 安全補強
+    └── classifier.py   # 指令分類（read / write / dangerous）
 ```
 
 | 禁令 | 說明 |
@@ -113,8 +115,8 @@ src/council_agent/
 | `cli.py` **禁止**直接呼叫 `tools/*` | 業務邏輯在 orchestrator / crews |
 | Tool 可預期錯誤**禁止** throw | 須回傳 `ToolResult(success=False)` |
 | filesystem / shell tool **必須**經 `WorkspaceGuard` | 在函式入口驗證路徑 |
-| v0.5 前**禁止**新增 `security/` 或指令分類 | 屬 ROADMAP v0.6+ Non-goal |
-| v0.5 **禁止**宣稱已具完整安全機制 | `shell=True` 空窗期見 README 警示 |
+| `run_command` **必須**經指令分類器 | `dangerous` 預設拒絕（v0.6）；確認／政策屬後續版本 |
+| v0.6 **禁止**宣稱已具完整安全機制 | 分類為 pattern 啟發式；確認／審計／Trust Tier 見 ROADMAP v0.7+ |
 
 ## 漸進式整合（硬性）
 
