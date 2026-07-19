@@ -15,6 +15,13 @@ from council_agent.crews.verification import build_verification_crew, run_verifi
 from council_agent.llm.openrouter import make_llm
 from council_agent.sandbox.config import is_sandbox_initialized
 from council_agent.sandbox.session import SessionManager
+from council_agent.security import (
+    ConfirmFn,
+    ConfirmMode,
+    ConfirmationPolicy,
+    reset_confirmation_policy,
+    set_confirmation_policy,
+)
 from council_agent.tools import ToolCallTracker
 from council_agent.types import (
     CouncilResult,
@@ -122,6 +129,8 @@ def run_council(
     *,
     verbose: bool = False,
     project_root: Path | str | None = None,
+    confirm_mode: ConfirmMode = ConfirmMode.COMPAT,
+    confirm_fn: ConfirmFn | None = None,
 ) -> CouncilResult:
     """Run the full three-phase council pipeline with optional escalation."""
     settings = get_settings()
@@ -156,6 +165,9 @@ def run_council(
         execution_crew.verbose = True
         verification_crew.verbose = True
 
+    policy_token = set_confirmation_policy(
+        ConfirmationPolicy(mode=confirm_mode, confirm_fn=confirm_fn)
+    )
     session_status = "completed"
     try:
         plan = run_planning(planning_crew, prompt)
@@ -189,6 +201,7 @@ def run_council(
         session_status = "failed"
         raise
     finally:
+        reset_confirmation_policy(policy_token)
         if session is not None:
             # Keep count in sync if tools logged via tracker but finalize late.
             session.meta.tool_call_count = max(

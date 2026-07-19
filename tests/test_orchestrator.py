@@ -4,6 +4,7 @@ from unittest.mock import MagicMock, patch
 
 from council_agent.config.presets import get_preset_by_name
 from council_agent.orchestrator import run_council
+from council_agent.security import ConfirmMode, get_confirmation_policy
 from council_agent.types import (
     ExecutionResult,
     PlanArtifact,
@@ -101,3 +102,45 @@ def test_run_council_fail_triggers_escalation(
     mock_esc_run.assert_called_once()
     assert result.escalated is True
     assert result.final_output == "fixed result"
+
+
+@patch("council_agent.orchestrator.build_planning_crew")
+@patch("council_agent.orchestrator.build_execution_crew")
+@patch("council_agent.orchestrator.build_verification_crew")
+def test_run_council_installs_and_resets_confirm_policy(
+    mock_verify_build: MagicMock,
+    mock_exec_build: MagicMock,
+    mock_plan_build: MagicMock,
+) -> None:
+    preset = get_preset_by_name(PRESETS_DIR, "glm-stack")
+    plan = PlanArtifact(raw="{}", steps=["a"], success_criteria=[], risks=[])
+    execution = ExecutionResult(raw="result")
+    verdict = VerificationVerdict(
+        status=VerdictStatus.PASS,
+        raw='{"status": "PASS"}',
+        issues=[],
+        summary="ok",
+    )
+    seen: list[ConfirmMode] = []
+
+    def _capture_exec(*_args, **_kwargs):
+        seen.append(get_confirmation_policy().mode)
+        return execution
+
+    with (
+        patch("council_agent.orchestrator.run_planning", return_value=plan),
+        patch(
+            "council_agent.orchestrator.run_execution",
+            side_effect=_capture_exec,
+        ),
+        patch("council_agent.orchestrator.run_verification", return_value=verdict),
+    ):
+        run_council(
+            "test prompt",
+            preset,
+            "fake-key",
+            confirm_mode=ConfirmMode.AUTO,
+        )
+
+    assert seen == [ConfirmMode.AUTO]
+    assert get_confirmation_policy().mode is ConfirmMode.COMPAT
