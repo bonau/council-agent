@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Pipeline coordination for tool call tracking, limits, session persistence, and passing structured execution summaries to Verification. Introduced in v0.4 alongside `run_tests`; v0.5 adds automatic tracker mounting and optional sandbox sessions.
+Pipeline coordination for tool call tracking, limits, session persistence, confirmation policy installation, and passing structured execution summaries to Verification. Introduced in v0.4 alongside `run_tests`; v0.5 adds automatic tracker mounting and optional sandbox sessions; v0.7 installs confirmation policy for the run.
 
 ## Requirements
 
@@ -70,3 +70,26 @@ During execution, the orchestrator SHALL attach a `ToolCallTracker` to Execution
 
 - **WHEN** the Execution Crew completes after invoking tools
 - **THEN** `ExecutionResult.tool_summaries` contains one entry per recorded tool call
+
+### Requirement: Orchestrator installs confirmation policy for the run
+
+`run_council` SHALL accept a confirmation mode (and optional confirm function for `ask`) and SHALL install that confirmation policy for the duration of the pipeline, including escalation when it runs. The policy SHALL be reset when the run completes or fails.
+
+#### Scenario: Policy active during execution
+
+- **WHEN** `run_council` is invoked with confirmation mode `auto`
+- **THEN** tool calls during execution observe `auto` confirmation behavior
+
+#### Scenario: Policy reset after run
+
+- **WHEN** `run_council` completes (success or failure)
+- **THEN** the confirmation policy returns to the prior/default context value
+
+### Requirement: CLI passes resolved confirmation mode to orchestrator
+
+The `council run` command SHALL resolve the confirmation mode from `--yes` and TTY detection and SHALL pass that mode into `run_council` without calling tool modules directly from the CLI.
+
+#### Scenario: council run forwards --yes
+
+- **WHEN** the user invokes `council run` with `--yes`
+- **THEN** `run_council` receives confirmation mode `auto`

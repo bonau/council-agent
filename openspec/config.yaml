@@ -9,8 +9,8 @@ context: |
   Testing: uv run pytest
   Docs: README.md, ROADMAP.md, CONTRIBUTING.md, AGENTS.md
   Development policy: Spec-driven Development with OpenSpec (see AGENTS.md)
-  Current version: v0.6.0 — command classification on run_command; sandbox MVP retained
-  Capabilities: tools (filesystem, shell, run_tests, CrewAI wrappers), sandbox (WorkspaceGuard, session, CLI), orchestration (tracker, max_tool_calls, auto summaries), security (command classifier on run_command)
+  Current version: v0.7.0 — interactive confirmation for dangerous/write shell and filesystem mutate tools; command classification retained
+  Capabilities: tools (filesystem, shell, run_tests, CrewAI wrappers), sandbox (WorkspaceGuard, session, CLI), orchestration (tracker, max_tool_calls, auto summaries, confirmation policy), security (command classifier, interactive confirmation modes ask/auto/refuse/compat)
 
 rules:
   proposal:

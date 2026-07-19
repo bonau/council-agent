@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import sys
 from pathlib import Path
 
 import typer
@@ -19,6 +20,7 @@ from council_agent.sandbox.config import (
     resolve_workspace_root,
 )
 from council_agent.sandbox.session import SessionManager
+from council_agent.security import resolve_cli_confirm_mode
 
 app = typer.Typer(
     name="council",
@@ -178,17 +180,25 @@ def run(
         dir_okay=True,
         resolve_path=True,
     ),
+    yes: bool = typer.Option(
+        False,
+        "--yes",
+        "-y",
+        help="Skip confirmation prompts for dangerous/write operations (CI).",
+    ),
 ) -> None:
     """Run the full planning → execution → verification pipeline."""
     _configure_workspace(workspace)
     settings = get_settings()
     preset_name = preset or settings.council_default_preset
     selected = get_preset_by_name(settings.presets_dir, preset_name)
+    confirm_mode = resolve_cli_confirm_mode(yes=yes, is_tty=sys.stdin.isatty())
 
     console.print(
         Panel(
             f"[bold]Preset:[/bold] {selected.name}\n"
             f"[bold]Workspace:[/bold] {settings.council_workspace_root}\n"
+            f"[bold]Confirm:[/bold] {confirm_mode.value}\n"
             f"[bold]Task:[/bold] {prompt}",
             title="Council Agent",
             border_style="blue",
@@ -201,6 +211,7 @@ def run(
             preset=selected,
             api_key=settings.openrouter_api_key,
             verbose=verbose,
+            confirm_mode=confirm_mode,
         )
 
     if verbose:
