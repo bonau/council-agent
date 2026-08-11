@@ -17,8 +17,21 @@ from pathlib import Path
 from typing import Any, TypeAlias
 
 from pydantic import BaseModel, ConfigDict, field_validator, model_validator
+from pydantic import SecretStr
 
-from council_agent.security.authentication import masked_reference
+from council_agent.security.authentication import (
+    AuthenticationBinding,
+    AuthenticationManager,
+    AuthenticationReason,
+    ServiceStepUpProvider,
+    StepUpProvider,
+    authentication_audit_sink,
+    masked_reference,
+)
+from council_agent.security.audit import (
+    DEFAULT_EVENTS_FILENAME,
+    AuditLogger,
+)
 from council_agent.security.principal import (
     Principal,
     PrincipalKind,
@@ -28,9 +41,11 @@ from council_agent.security.principal import (
 TRUST_STORE_SCHEMA_VERSION = 1
 TRUST_STATE_FILENAME = "grants.json"
 TRUST_LOCK_FILENAME = "grants.lock"
+TRUST_AUDIT_DIRECTORY = "audit"
 TRUST_DIRECTORY_MODE = 0o700
 TRUST_FILE_MODE = 0o600
 TRUST_REFERENCE_PREFIX = "sha256:"
+TRUST_MANAGEMENT_PURPOSE = "trust-store-management"
 TRUST_GRANT_ACTIONS = frozenset(
     {
         "read_file",
@@ -63,9 +78,15 @@ class TrustStoreReason(str, Enum):
     INVALID_SCHEMA = "trust_store_invalid_schema"
     CORRUPT = "trust_store_corrupt"
     CONFLICT = "trust_store_conflict"
+    INVALID_REQUEST = "trust_grant_invalid_request"
     GRANT_NOT_FOUND = "trust_grant_not_found"
     GRANT_REVOKED = "trust_grant_revoked"
     CLOCK_INVALID = "trust_store_clock_invalid"
+    AUTHENTICATION_MISSING = "trust_authentication_missing"
+    AUTHENTICATION_DENIED = "trust_authentication_denied"
+    SCOPE_INSUFFICIENT = "trust_scope_insufficient"
+    PRINCIPAL_MISMATCH = "trust_principal_mismatch"
+    AUDIT_FAILURE = "trust_audit_failure"
 
 
 class TrustStoreError(RuntimeError):
@@ -85,6 +106,14 @@ class GrantLookupReason(str, Enum):
     EXPIRED = "trust_grant_expired"
     PRINCIPAL_SCOPE_INSUFFICIENT = "trust_principal_scope_insufficient"
     GRANT_SCOPE_INSUFFICIENT = "trust_grant_scope_insufficient"
+
+
+class TrustOperation(str, Enum):
+    """Authenticated trust-store management operations."""
+
+    GRANT = "grant"
+    REVOKE = "revoke"
+    LIST = "list"
 
 
 @dataclass(frozen=True)
@@ -412,6 +441,71 @@ class _TrustGrantRepository:
     @property
     def lock_path(self) -> Path:
         return self.root / TRUST_LOCK_FILENAME
+
+    @property
+    def audit_path(self) -> Path:
+        return self.root / TRUST_AUDIT_DIRECTORY / DEFAULT_EVENTS_FILENAME
+
+    def audit_logger(self) -> AuditLogger:
+        """Open the validated user-owned audit sink without weakening its modes."""
+
+        self._ensure_secure_root()
+        audit_directory = self.audit_path.parent
+        try:
+            audit_directory.mkdir(mode=TRUST_DIRECTORY_MODE)
+        except FileExistsError:
+            pass
+        except OSError as exc:
+            raise TrustStoreError(
+                "Trust audit directory could not be created",
+                TrustStoreReason.AUDIT_FAILURE,
+            ) from exc
+        self._validate_existing_directory(audit_directory, strict=True)
+        if Path(os.path.realpath(audit_directory)) != audit_directory:
+            raise TrustStoreError(
+                "Trust audit path cannot contain symlinks",
+                TrustStoreReason.UNSAFE_PATH,
+            )
+
+        directory_flags = os.O_RDONLY | getattr(os, "O_DIRECTORY", 0)
+        directory_flags |= getattr(os, "O_NOFOLLOW", 0)
+        try:
+            directory_fd = os.open(audit_directory, directory_flags)
+        except OSError as exc:
+            raise TrustStoreError(
+                "Trust audit directory could not be opened safely",
+                TrustStoreReason.AUDIT_FAILURE,
+            ) from exc
+        try:
+            self._validate_fd(
+                directory_fd,
+                directory=True,
+                strict_directory=True,
+            )
+            for name in (
+                DEFAULT_EVENTS_FILENAME,
+                f"{DEFAULT_EVENTS_FILENAME}.lock",
+            ):
+                descriptor = os.open(
+                    name,
+                    os.O_CREAT | os.O_RDWR | getattr(os, "O_NOFOLLOW", 0),
+                    TRUST_FILE_MODE,
+                    dir_fd=directory_fd,
+                )
+                try:
+                    self._validate_fd(descriptor, directory=False)
+                finally:
+                    os.close(descriptor)
+        except (OSError, TrustStoreError) as exc:
+            if isinstance(exc, TrustStoreError):
+                raise
+            raise TrustStoreError(
+                "Trust audit files could not be opened safely",
+                TrustStoreReason.AUDIT_FAILURE,
+            ) from exc
+        finally:
+            os.close(directory_fd)
+        return AuditLogger(self.audit_path)
 
     def read_document(self) -> TrustStoreDocument:
         with self._locked_root() as root_fd:
@@ -905,6 +999,652 @@ class _TrustGrantRepository:
 
     def _now(self) -> datetime:
         return _aware_utc(self._clock(), "clock result")
+
+
+def trust_management_binding(
+    principal: Principal,
+    store_root: Path | str,
+    session_id: str,
+    operation: TrustOperation,
+    arguments: Mapping[str, Any],
+) -> AuthenticationBinding:
+    """Build the exact one-use authentication binding for one store operation."""
+
+    if not isinstance(principal, Principal):
+        raise ValueError("Trust management principal is invalid")
+    principal.__post_init__()
+    if not isinstance(session_id, str) or not session_id.strip():
+        raise ValueError("Trust management session_id must be non-empty")
+    if not isinstance(operation, TrustOperation):
+        raise ValueError("Trust management operation is invalid")
+    try:
+        envelope = json.dumps(
+            {
+                "operation": operation.value,
+                "arguments": dict(arguments),
+            },
+            ensure_ascii=False,
+            sort_keys=True,
+            separators=(",", ":"),
+            allow_nan=False,
+        )
+    except (TypeError, ValueError) as exc:
+        raise ValueError("Trust management arguments must be canonical JSON") from exc
+    canonical_root = str(
+        Path(os.path.abspath(os.path.expanduser(str(store_root)))).resolve(strict=False)
+    )
+    return AuthenticationBinding(
+        principal_ref=principal.audit_ref,
+        workspace_ref=masked_reference(canonical_root),
+        session_id=session_id,
+        purpose=TRUST_MANAGEMENT_PURPOSE,
+        action_ref=masked_reference(envelope),
+    )
+
+
+class TrustGrantStore:
+    """Authenticated user-owned grant administration and exact lookup API."""
+
+    def __init__(
+        self,
+        workspace_root: Path | str,
+        *,
+        root: Path | str | None = None,
+        clock: Clock = _utc_now,
+    ) -> None:
+        self._clock = clock
+        self._repository = _TrustGrantRepository(
+            root or default_trust_store_root(),
+            workspace_root,
+            clock=clock,
+        )
+
+    @property
+    def root(self) -> Path:
+        return self._repository.root
+
+    @property
+    def workspace_root(self) -> Path:
+        return self._repository.workspace_root
+
+    @property
+    def state_path(self) -> Path:
+        return self._repository.state_path
+
+    @property
+    def audit_path(self) -> Path:
+        return self._repository.audit_path
+
+    def service_authentication(
+        self,
+        verifier: SecretStr,
+        *,
+        request_id: str,
+        session_id: str,
+    ) -> tuple[AuthenticationManager, ServiceStepUpProvider]:
+        """Create run-local service authentication audited under the user store."""
+
+        _require_correlation(request_id, session_id)
+        logger = self._repository.audit_logger()
+        sink = authentication_audit_sink(
+            logger,
+            request_id=request_id,
+            session_id=session_id,
+        )
+        manager = AuthenticationManager(
+            verifier,
+            clock=self._clock,
+            event_sink=sink,
+        )
+        return manager, ServiceStepUpProvider(manager, verifier)
+
+    def grant(
+        self,
+        principal: Principal,
+        action: str,
+        resource: Mapping[str, Any],
+        scopes: Iterable[PrincipalScope | str],
+        *,
+        session_id: str,
+        request_id: str,
+        authentication_manager: AuthenticationManager | None,
+        step_up_provider: StepUpProvider | None,
+        expires_at: datetime | None = None,
+    ) -> TrustGrant:
+        logger = self._repository.audit_logger()
+        _require_correlation(request_id, session_id)
+        try:
+            grant = build_trust_grant(
+                principal,
+                action,
+                resource,
+                scopes,
+                created_at=self._now(),
+                expires_at=expires_at,
+            )
+        except (TypeError, ValueError) as exc:
+            self._record(
+                logger,
+                operation=TrustOperation.GRANT,
+                success=False,
+                reason=TrustStoreReason.INVALID_REQUEST.value,
+                principal=principal if isinstance(principal, Principal) else None,
+                session_id=session_id,
+                request_id=request_id,
+                action=action,
+                resource=resource if isinstance(resource, Mapping) else None,
+            )
+            raise TrustStoreError(
+                "Trust grant request is invalid",
+                TrustStoreReason.INVALID_REQUEST,
+            ) from exc
+        arguments = {
+            "action": grant.action,
+            "resource": grant.resource,
+            "scopes": [scope.value for scope in grant.scopes],
+            "expires_at": (
+                None if grant.expires_at is None else grant.expires_at.isoformat()
+            ),
+        }
+        self._authenticate(
+            logger,
+            principal,
+            TrustOperation.GRANT,
+            arguments,
+            required_scope=PrincipalScope.HIGH_RISK_MANAGE,
+            session_id=session_id,
+            request_id=request_id,
+            authentication_manager=authentication_manager,
+            step_up_provider=step_up_provider,
+            action=grant.action,
+            resource=grant.resource,
+            scopes=grant.scopes,
+        )
+        try:
+            self._repository.add(grant)
+        except TrustStoreError as exc:
+            self._record(
+                logger,
+                operation=TrustOperation.GRANT,
+                success=False,
+                reason=exc.reason.value,
+                principal=principal,
+                session_id=session_id,
+                request_id=request_id,
+                grant=grant,
+            )
+            raise
+        self._record(
+            logger,
+            operation=TrustOperation.GRANT,
+            success=True,
+            reason="trust_grant_created",
+            principal=principal,
+            session_id=session_id,
+            request_id=request_id,
+            grant=grant,
+        )
+        return grant
+
+    def revoke(
+        self,
+        principal: Principal,
+        grant_id: str,
+        *,
+        session_id: str,
+        request_id: str,
+        authentication_manager: AuthenticationManager | None,
+        step_up_provider: StepUpProvider | None,
+    ) -> TrustGrant:
+        logger = self._repository.audit_logger()
+        _require_correlation(request_id, session_id)
+        arguments = {"grant_id": grant_id}
+        self._authenticate(
+            logger,
+            principal,
+            TrustOperation.REVOKE,
+            arguments,
+            required_scope=PrincipalScope.HIGH_RISK_MANAGE,
+            session_id=session_id,
+            request_id=request_id,
+            authentication_manager=authentication_manager,
+            step_up_provider=step_up_provider,
+            grant_id=grant_id,
+        )
+        try:
+            document = self._repository.read_document()
+            grant = next(
+                item for item in document.grants if item.grant_id == grant_id
+            )
+        except StopIteration as exc:
+            error = TrustStoreError(
+                "Trust grant does not exist",
+                TrustStoreReason.GRANT_NOT_FOUND,
+            )
+            self._record(
+                logger,
+                operation=TrustOperation.REVOKE,
+                success=False,
+                reason=error.reason.value,
+                principal=principal,
+                session_id=session_id,
+                request_id=request_id,
+                grant_id=grant_id,
+            )
+            raise error from exc
+        except TrustStoreError as exc:
+            self._record(
+                logger,
+                operation=TrustOperation.REVOKE,
+                success=False,
+                reason=exc.reason.value,
+                principal=principal,
+                session_id=session_id,
+                request_id=request_id,
+                grant_id=grant_id,
+            )
+            raise
+        if (
+            grant.principal_ref != principal.audit_ref
+            or grant.created_by_ref != principal.audit_ref
+        ):
+            self._record(
+                logger,
+                operation=TrustOperation.REVOKE,
+                success=False,
+                reason=TrustStoreReason.PRINCIPAL_MISMATCH.value,
+                principal=principal,
+                session_id=session_id,
+                request_id=request_id,
+                grant=grant,
+            )
+            raise TrustStoreError(
+                "Trust grant is bound to another principal",
+                TrustStoreReason.PRINCIPAL_MISMATCH,
+            )
+        try:
+            updated = self._repository.revoke(
+                grant_id,
+                principal.audit_ref,
+                revoked_at=self._now(),
+            )
+            revoked = next(item for item in updated.grants if item.grant_id == grant_id)
+        except TrustStoreError as exc:
+            self._record(
+                logger,
+                operation=TrustOperation.REVOKE,
+                success=False,
+                reason=exc.reason.value,
+                principal=principal,
+                session_id=session_id,
+                request_id=request_id,
+                grant=grant,
+            )
+            raise
+        self._record(
+            logger,
+            operation=TrustOperation.REVOKE,
+            success=True,
+            reason="trust_grant_revoked",
+            principal=principal,
+            session_id=session_id,
+            request_id=request_id,
+            grant=revoked,
+        )
+        return revoked
+
+    def list(
+        self,
+        principal: Principal,
+        *,
+        session_id: str,
+        request_id: str,
+        authentication_manager: AuthenticationManager | None,
+        step_up_provider: StepUpProvider | None,
+        include_inactive: bool = False,
+    ) -> tuple[TrustGrant, ...]:
+        logger = self._repository.audit_logger()
+        _require_correlation(request_id, session_id)
+        arguments = {"include_inactive": include_inactive}
+        self._authenticate(
+            logger,
+            principal,
+            TrustOperation.LIST,
+            arguments,
+            required_scope=PrincipalScope.READ,
+            session_id=session_id,
+            request_id=request_id,
+            authentication_manager=authentication_manager,
+            step_up_provider=step_up_provider,
+        )
+        try:
+            document = self._repository.read_document()
+            now = self._now()
+            grants = tuple(
+                grant
+                for grant in document.grants
+                if grant.principal_ref == principal.audit_ref
+                and (include_inactive or grant.is_active(now))
+            )
+        except TrustStoreError as exc:
+            self._record(
+                logger,
+                operation=TrustOperation.LIST,
+                success=False,
+                reason=exc.reason.value,
+                principal=principal,
+                session_id=session_id,
+                request_id=request_id,
+            )
+            raise
+        self._record(
+            logger,
+            operation=TrustOperation.LIST,
+            success=True,
+            reason="trust_grants_listed",
+            principal=principal,
+            session_id=session_id,
+            request_id=request_id,
+            count=len(grants),
+        )
+        return grants
+
+    def lookup(
+        self,
+        principal: Principal,
+        action: str,
+        resource: Mapping[str, Any],
+        required_scopes: Iterable[PrincipalScope | str],
+        *,
+        session_id: str,
+        request_id: str,
+    ) -> GrantLookupDecision:
+        logger = self._repository.audit_logger()
+        _require_correlation(request_id, session_id)
+        parsed_scopes = _parse_scope_set(required_scopes)
+        try:
+            decision = self._repository.lookup(
+                principal,
+                action,
+                resource,
+                parsed_scopes,
+                now=self._now(),
+            )
+        except (TrustStoreError, ValueError) as exc:
+            reason = (
+                exc.reason.value
+                if isinstance(exc, TrustStoreError)
+                else TrustStoreReason.INVALID_REQUEST.value
+            )
+            self._record(
+                logger,
+                operation="lookup",
+                success=False,
+                reason=reason,
+                principal=principal,
+                session_id=session_id,
+                request_id=request_id,
+                action=action,
+                resource=resource,
+                scopes=parsed_scopes,
+            )
+            if isinstance(exc, TrustStoreError):
+                raise
+            raise TrustStoreError(
+                "Trust grant lookup request is invalid",
+                TrustStoreReason.INVALID_REQUEST,
+            ) from exc
+        self._record(
+            logger,
+            operation="lookup",
+            success=decision.allowed,
+            reason=decision.reason.value,
+            principal=principal,
+            session_id=session_id,
+            request_id=request_id,
+            action=action,
+            resource=resource,
+            scopes=parsed_scopes,
+            grant_ref=decision.grant_ref,
+        )
+        return decision
+
+    def _authenticate(
+        self,
+        logger: AuditLogger,
+        principal: Principal,
+        operation: TrustOperation,
+        arguments: Mapping[str, Any],
+        *,
+        required_scope: PrincipalScope,
+        session_id: str,
+        request_id: str,
+        authentication_manager: AuthenticationManager | None,
+        step_up_provider: StepUpProvider | None,
+        action: str | None = None,
+        resource: Mapping[str, Any] | None = None,
+        scopes: Iterable[PrincipalScope] = (),
+        grant_id: str | None = None,
+    ) -> AuthenticationBinding:
+        try:
+            principal.__post_init__()
+        except (AttributeError, ValueError) as exc:
+            self._record(
+                logger,
+                operation=operation,
+                success=False,
+                reason=TrustStoreReason.INVALID_REQUEST.value,
+                principal=None,
+                session_id=session_id,
+                request_id=request_id,
+            )
+            raise TrustStoreError(
+                "Trust management principal is invalid",
+                TrustStoreReason.INVALID_REQUEST,
+            ) from exc
+        if required_scope not in principal.scopes:
+            self._record(
+                logger,
+                operation=operation,
+                success=False,
+                reason=TrustStoreReason.SCOPE_INSUFFICIENT.value,
+                principal=principal,
+                session_id=session_id,
+                request_id=request_id,
+                action=action,
+                resource=resource,
+                scopes=scopes,
+                grant_id=grant_id,
+            )
+            raise TrustStoreError(
+                "Council principal lacks the required trust management scope",
+                TrustStoreReason.SCOPE_INSUFFICIENT,
+            )
+        binding = trust_management_binding(
+            principal,
+            self.root,
+            session_id,
+            operation,
+            arguments,
+        )
+        if authentication_manager is None or step_up_provider is None:
+            self._record(
+                logger,
+                operation=operation,
+                success=False,
+                reason=TrustStoreReason.AUTHENTICATION_MISSING.value,
+                principal=principal,
+                session_id=session_id,
+                request_id=request_id,
+                action=action,
+                resource=resource,
+                scopes=scopes,
+                grant_id=grant_id,
+            )
+            raise TrustStoreError(
+                "Fresh trust management authentication is required",
+                TrustStoreReason.AUTHENTICATION_MISSING,
+            )
+        try:
+            token = step_up_provider(binding)
+            decision = (
+                None
+                if token is None
+                else authentication_manager.consume_step_up(token, binding)
+            )
+        except Exception as exc:
+            self._record(
+                logger,
+                operation=operation,
+                success=False,
+                reason=TrustStoreReason.AUTHENTICATION_DENIED.value,
+                principal=principal,
+                session_id=session_id,
+                request_id=request_id,
+                action=action,
+                resource=resource,
+                scopes=scopes,
+                grant_id=grant_id,
+            )
+            raise TrustStoreError(
+                "Trust management authentication failed",
+                TrustStoreReason.AUTHENTICATION_DENIED,
+            ) from exc
+        if (
+            decision is None
+            or not decision.allowed
+            or decision.reason is not AuthenticationReason.STEP_UP_ALLOWED
+        ):
+            self._record(
+                logger,
+                operation=operation,
+                success=False,
+                reason=TrustStoreReason.AUTHENTICATION_DENIED.value,
+                principal=principal,
+                session_id=session_id,
+                request_id=request_id,
+                action=action,
+                resource=resource,
+                scopes=scopes,
+                grant_id=grant_id,
+                authentication_reason=(
+                    AuthenticationReason.MISSING.value
+                    if decision is None
+                    else decision.reason.value
+                ),
+            )
+            raise TrustStoreError(
+                "Trust management authentication was denied",
+                TrustStoreReason.AUTHENTICATION_DENIED,
+            )
+        self._record(
+            logger,
+            operation=operation,
+            success=True,
+            reason="trust_authentication_succeeded",
+            principal=principal,
+            session_id=session_id,
+            request_id=request_id,
+            action=action,
+            resource=resource,
+            scopes=scopes,
+            grant_id=grant_id,
+            authentication_reason=decision.reason.value,
+        )
+        return binding
+
+    def _record(
+        self,
+        logger: AuditLogger,
+        *,
+        operation: TrustOperation | str,
+        success: bool,
+        reason: str,
+        principal: Principal | None,
+        session_id: str,
+        request_id: str,
+        action: str | None = None,
+        resource: Mapping[str, Any] | None = None,
+        scopes: Iterable[PrincipalScope] = (),
+        grant: TrustGrant | None = None,
+        grant_id: str | None = None,
+        grant_ref: str | None = None,
+        count: int | None = None,
+        authentication_reason: str | None = None,
+    ) -> None:
+        operation_value = (
+            operation.value if isinstance(operation, TrustOperation) else operation
+        )
+        target_action = grant.action if grant is not None else action
+        target_resource = grant.resource if grant is not None else resource
+        target_scopes = grant.scopes if grant is not None else tuple(scopes)
+        resolved_grant_ref = (
+            grant.grant_ref
+            if grant is not None
+            else grant_ref
+            if grant_ref is not None
+            else masked_reference(grant_id)
+            if grant_id
+            else None
+        )
+        metadata = {
+            "operation": operation_value,
+            "reason": reason,
+            "store_ref": masked_reference(str(self.root)),
+            "principal_ref": None if principal is None else principal.audit_ref,
+            "creator_ref": None if grant is None else grant.created_by_ref,
+            "grant_ref": resolved_grant_ref,
+            "action_ref": (
+                None if target_action is None else masked_reference(target_action)
+            ),
+            "resource_ref": _resource_reference(target_resource),
+            "scopes": sorted(
+                scope.value for scope in target_scopes if isinstance(scope, PrincipalScope)
+            ),
+            "count": count,
+            "authentication_reason": authentication_reason,
+        }
+        try:
+            logger.record(
+                "trust_grant_store",
+                {
+                    "operation": operation_value,
+                    "grant_ref": resolved_grant_ref,
+                    "action_ref": metadata["action_ref"],
+                    "resource_ref": metadata["resource_ref"],
+                },
+                success=success,
+                error=None if success else reason,
+                metadata={"trust_grant": metadata},
+                session_id=session_id,
+                request_id=request_id,
+                decision="allow" if success else "deny",
+            )
+        except Exception as exc:
+            raise TrustStoreError(
+                "Trust grant audit evidence could not be persisted",
+                TrustStoreReason.AUDIT_FAILURE,
+            ) from exc
+
+    def _now(self) -> datetime:
+        return _aware_utc(self._clock(), "clock result")
+
+
+def _require_correlation(request_id: str, session_id: str) -> None:
+    if not isinstance(request_id, str) or not request_id.strip():
+        raise ValueError("Trust management request_id must be non-empty")
+    if not isinstance(session_id, str) or not session_id.strip():
+        raise ValueError("Trust management session_id must be non-empty")
+
+
+def _resource_reference(resource: Mapping[str, Any] | None) -> str | None:
+    if resource is None:
+        return None
+    try:
+        canonical = canonical_resource_json(resource)
+    except (TypeError, ValueError):
+        return masked_reference("invalid-trust-resource")
+    return masked_reference(canonical)
 
 
 def _parse_scope_set(
