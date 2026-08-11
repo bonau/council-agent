@@ -468,7 +468,7 @@ alpha 才開始實作 Trust Tier 0/1/2 runtime；本紀錄中的 v0.9.x 工作�
 
 ### 2026-08-11 17:26 UTC — v0.9.2 Policy Middleware 實作與 regression
 
-- 狀態：runtime／integration regression、OpenSpec sync／archive 與 active-change gate 通過；post-archive gate 待完成
+- 狀態：runtime／integration regression、OpenSpec sync／archive、active-change 與 post-archive gate 全部通過
 - 基準：branch `cursor/v092-policy-middleware-d691`、pre-archive implementation revision `884e278`、package v0.9.1、change `policy-middleware`
 - 原始旁路：
   - direct `tools.filesystem`／`tools.shell` 呼叫只執行 tool-local guard，沒有 wrapper-owned tracker、session、audit。
@@ -540,6 +540,7 @@ alpha 才開始實作 Trust Tier 0/1/2 runtime；本紀錄中的 v0.9.x 工作�
   - Unknown、typo、wrong version、secret-bearing `grant` error、known+unknown whole-file refusal均有單元測試；invalid policy 在 session／context／crew 建立前失敗。
   - Public filesystem 與 `rm council.policy.yaml` refusal 斷言原始內容不變，shell subprocess call count 為 0。
   - Active-change `./scripts/check.sh`：334 passed；changes strict 1/1；main specs strict 5/5；exit code 0。
+  - Post-archive `./scripts/check.sh`（archive commit `48d2272`）：334 passed；no active changes；main specs strict 5/5；exit code 0。
   - 詳細 evidence：[`v0.9.3-policy-trust-boundary-evidence.md`](v0.9.3-policy-trust-boundary-evidence.md)。
 - 剩餘風險／延期責任：
   - Path deny 是 product tool boundary，不是 OS sandbox；`run_tests` 執行的專案程式碼、host user、未建模 executable 或外部程序仍可依 host 權限改寫 workspace。
@@ -548,4 +549,4 @@ alpha 才開始實作 Trust Tier 0/1/2 runtime；本紀錄中的 v0.9.x 工作�
   - Trust Tier 0/1/2 runtime 與 `council trust` 仍只屬 v1.0-alpha。
 - 文件影響：README、known issues、v0.9.x handoff、security／sandbox／orchestration deltas與本 learning log 更新；feature branch 不 bump version。
 - Archive：17/17 tasks complete；delta 已同步；change 移至 `openspec/changes/archive/2026-08-11-policy-trust-boundary/`。
-- 下一步：執行 post-archive `./scripts/check.sh`。
+- 下一步：合併 feature PR；之後只在 `release/0.9.3` 做版本 bump／tag。
