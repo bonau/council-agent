@@ -4,7 +4,7 @@
 
 > **開發方式**：所有版本里程碑的實作，皆採 **Spec-driven Development** 並搭配 [OpenSpec](https://github.com/Fission-AI/OpenSpec)。每個 feature 分支應對應一個 OpenSpec change，詳見 [AGENTS.md](AGENTS.md)。
 
-## 現況（v1.0-alpha Trust Tier candidate；package metadata 仍為 v0.9.9 直至 release/1.0.0a1）
+## 現況（v1.0.0-alpha.1）
 
 | 能力 | 狀態 |
 |------|------|
@@ -25,10 +25,10 @@
 | 政策設定檔（`council.policy.yaml`） | ✅ |
 | Verification／escalation attempt evidence closure | ✅ |
 | Trust Tier decision matrix | ✅（matrix-v2） |
-| Trust Tier 0/1/2 runtime + `--trust-tier` | ✅（feature candidate；待 alpha tag） |
+| Trust Tier 0/1/2 runtime + `--trust-tier` | ✅ |
 | Audit predecessor hash chain | ❌（GA） |
 
-已發佈基線 `v0.9.9`。`trust-framework` feature 啟用 Trust Tier runtime、exact grant 消費與 matrix-v2；版本 bump／tag 只在 `release/1.0.0a1`。
+已發佈基線 `v1.0.0-alpha.1`：Trust Tier 0/1/2 runtime、exact grant 消費、matrix-v2。下一階段為 v1.0-beta（凍結 schema、公開測試）。
 
 > 已知限制：shell／WorkspaceGuard 非 OS sandbox；`run_tests` 會執行 project code；ConfirmMode／`--yes` ≠ Trust Tier；project policy 不能設定 tier；audit 無 predecessor-linked／external anchor。
 

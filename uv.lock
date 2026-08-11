@@ -574,7 +574,7 @@ wheels = [
 
 [[package]]
 name = "council-agent"
-version = "0.9.9"
+version = "1.0.0a1"
 source = { editable = "." }
 dependencies = [
     { name = "crewai" },
