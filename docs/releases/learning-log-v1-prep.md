@@ -740,7 +740,7 @@ alpha 才開始實作 Trust Tier 0/1/2 runtime；本紀錄中的 v0.9.x 工作�
 
 ### 2026-08-11 19:40 UTC — v0.9.8 trust-decision-matrix implementation
 
-- 狀態：純矩陣、dispatcher evidence、CLI／Crew／library parity與文件完成；等待OpenSpec sync/archive及final gates
+- 狀態：純矩陣、dispatcher evidence、CLI／Crew／library parity、OpenSpec sync/archive與active/post-archive gates全部通過
 - 基準：branch `cursor/v098-trust-decision-matrix-d691`、tag `v0.9.7`、package metadata不bump、change `trust-decision-matrix`
 - 原始邊界問題（V1-009／SEC-P0-005）：
   - `ConfirmMode.AUTO`／`--yes`表示如何回覆互動，卻缺少單一合成契約，容易被後續Tier runtime誤當principal、scope、authentication或grant。
@@ -766,11 +766,12 @@ alpha 才開始實作 Trust Tier 0/1/2 runtime；本紀錄中的 v0.9.x 工作�
   - Pure+dispatcher focused 51 passed；phase-2 full 549 passed。
   - All v0.9.8 suites focused 55 passed；phase-3 full 553 passed。
   - Active-change `./scripts/check.sh`：553 passed；change 1/1、main specs 5/5 strict passed；exit 0。
-  - Post-archive `./scripts/check.sh`與archive path待final gate後回填。
+  - Post-archive `./scripts/check.sh`：553 passed；active changes 0、main specs 5/5 strict passed；exit 0。
   - 詳細evidence：[`v0.9.8-trust-decision-matrix-evidence.md`](v0.9.8-trust-decision-matrix-evidence.md)。
 - 剩餘風險／v1.0-alpha接線：
   - Tier runtime須另加typed Tier 0/1/2 source與tier→grant/interaction translator，顯式exact grant lookup，再把closed result傳入vector；不得改policy/scope/auth/invalid-grant precedence。
   - `--trust-tier`只能在該change連同authentication、audit、migration與e2e證據新增。任何state/precedence修改必須version matrix。
   - 本版不提供hostile in-process、OS/process/network isolation、remote IAM或externally anchored hash chain。
 - 文件影響：known issues關閉V1-009／SEC-P0-005的matrix scope、handoff進入v0.9.8、security/tools/orchestration delta與本learning log；feature branch不bump version。
-- 下一步：sync三份delta、strict validate、active gate、archive、post-archive gate；之後只接v0.9.9 `evidence-closure`，不得開Trust Tier runtime。
+- Archive：21/21 tasks complete；security/tools/orchestration delta已同步；change移至`openspec/changes/archive/2026-08-11-trust-decision-matrix/`。
+- 下一步：合併feature PR；之後只接v0.9.9 `evidence-closure`，不得開Trust Tier runtime。只有後續`release/0.9.8`可做版本bump/tag。
