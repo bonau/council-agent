@@ -9,7 +9,7 @@
 
 - [x] 2.1 Derive and validate `SecurityContext.policy_version` as `builtin` or `project-policy/v1` from the captured policy snapshot.
 - [x] 2.2 Update orchestrator tests and fixtures to use version 1 policy, prove schema/version/unknown-field failures occur before session/context/crews, and assert one versioned snapshot through the pipeline.
-- [ ] 2.3 Run `uv run pytest` with the full suite before adding framework/tool boundary protection.
+- [x] 2.3 Run `uv run pytest` with the full suite before adding framework/tool boundary protection.
 
 ## 3. Product tool policy-file protection
 
