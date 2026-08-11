@@ -10,9 +10,11 @@ from typer.testing import CliRunner
 
 from council_agent.cli import app
 from council_agent.config.settings import get_settings
+from council_agent.llm.openrouter import OpenRouterCredential
 from council_agent.sandbox.config import is_sandbox_initialized
 from council_agent.sandbox.session import SessionManager
 from council_agent.sandbox.workspace import get_workspace_guard
+from council_agent.security import Principal, PrincipalScope
 from council_agent.types import (
     CouncilResult,
     ExecutionResult,
@@ -22,6 +24,22 @@ from council_agent.types import (
 )
 
 runner = CliRunner()
+
+
+def _fake_result() -> CouncilResult:
+    return CouncilResult(
+        prompt="hi",
+        plan=PlanArtifact(raw="{}", steps=[], success_criteria=[], risks=[]),
+        execution=ExecutionResult(raw="done"),
+        verdict=VerificationVerdict(
+            status=VerdictStatus.PASS,
+            raw="{}",
+            issues=[],
+            summary="ok",
+        ),
+        escalated=False,
+        final_output="done",
+    )
 
 
 def test_sandbox_init_creates_council_dir(
@@ -135,6 +153,12 @@ def test_run_workspace_flag_applies_root(
     assert get_workspace_guard().root == project.resolve()
     assert "Workspace" in result.output
     assert project.name in result.output
+    credential = mock_run.call_args.kwargs["provider_credential"]
+    principal = mock_run.call_args.kwargs["principal"]
+    assert isinstance(credential, OpenRouterCredential)
+    assert credential.get_secret_value() == "test-key"
+    assert isinstance(principal, Principal)
+    assert principal.principal_id != "test-key"
     # CliRunner stdin is not a TTY → refuse unless --yes
     assert mock_run.call_args.kwargs.get("confirm_mode").value == "refuse"
 
@@ -166,3 +190,45 @@ def test_run_yes_flag_passes_auto_confirm_mode(
     assert mock_run.call_args.kwargs.get("confirm_mode").value == "auto"
     assert "Confirm" in result.output
     assert "auto" in result.output
+
+
+def test_run_loads_read_only_principal_separately_from_provider(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("OPENROUTER_API_KEY", "provider-only-secret")
+    monkeypatch.setenv("COUNCIL_PRINCIPAL_ID", "local-test-principal")
+    monkeypatch.setenv("COUNCIL_PRINCIPAL_SCOPES", "read")
+    get_settings.cache_clear()
+
+    with patch(
+        "council_agent.cli.run_council",
+        return_value=_fake_result(),
+    ) as mock_run:
+        result = runner.invoke(app, ["run", "hi"])
+
+    assert result.exit_code == 0, result.output
+    credential = mock_run.call_args.kwargs["provider_credential"]
+    principal = mock_run.call_args.kwargs["principal"]
+    assert credential.get_secret_value() == "provider-only-secret"
+    assert principal.principal_id == "local-test-principal"
+    assert principal.scopes == frozenset({PrincipalScope.READ})
+    assert "local-test-principal" not in result.output
+    assert principal.audit_ref in result.output
+
+
+def test_run_rejects_unknown_principal_scope_before_pipeline(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    unknown = "sk-or-v1-unknown-scope-secret"
+    monkeypatch.setenv("OPENROUTER_API_KEY", "provider-only-secret")
+    monkeypatch.setenv("COUNCIL_PRINCIPAL_SCOPES", f"read,{unknown}")
+    get_settings.cache_clear()
+
+    with patch("council_agent.cli.run_council") as mock_run:
+        result = runner.invoke(app, ["run", "hi"])
+
+    assert result.exit_code == 2
+    assert "Principal Configuration Error" in result.output
+    assert "Unknown Council principal scope" in result.output
+    assert unknown not in result.output
+    mock_run.assert_not_called()

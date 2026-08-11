@@ -168,11 +168,31 @@ Schema version 1 只接受 `schema_version` 與上列三個限制欄位，且型
 
 Policy 在 command analysis 與路徑驗證後、confirmation 前套用。`run_command` pattern 比對 canonical simple command；`run_tests` 的 canonical action 以受信任的目前 Python executable 開頭並包含 `-m pytest`。舊有 `"python -m pytest *"`／`"uv run pytest *"` pattern 不會授權 raw `run_command`（兩者已不在 simple-command registry），需依實際 canonical 表示調整 `run_tests` allowlist。
 
+### Principal 與 tool scopes
+
+`OPENROUTER_API_KEY` 只供 OpenRouter 模型連線使用，不是 Council tool 授權身分。每次 `council run` 會另外建立 local Council principal；可用 `COUNCIL_PRINCIPAL_ID` 指定穩定 ID，未指定時依本機 OS user 產生。Audit/session 只記錄不可逆的 `sha256:` principal reference，不寫入原始 ID 或 provider key。
+
+`COUNCIL_PRINCIPAL_SCOPES` 是逗號分隔的 closed set；未知值會在 pipeline 啟動前拒絕：
+
+| Scope | 允許進入的 action gate |
+|------|------|
+| `read` | `read_file`、`list_dir`；shell read 另需 `shell` |
+| `filesystem:mutate` | `write_file`、`delete_file`；shell write 另需 `shell` |
+| `test` | `run_tests`（同時必須有 `filesystem:mutate`，因測試程式可改檔） |
+| `shell` | `run_command`（另依 read/write/dangerous 累加 scope） |
+| `high-risk:manage` | dangerous shell（同時必須有 `shell` 與 `filesystem:mutate`） |
+
+例如 `COUNCIL_PRINCIPAL_SCOPES=read` 是 read-only principal，不能以 `run_tests`、shell、Crew wrapper、project allowlist 或 `--yes` 間接取得 mutate 權限。Scope decision 每個 action 重新解析；缺 principal、scope 不足、identity mismatch 或 resolver revoke 一律在 tool handler 前 fail closed。
+
+這是 authorization scope model，不是 authentication：local principal 設定、session UUID 與 `--yes` 都不能證明使用者身分。Session authentication、user-owned grant store 與 Trust Tier runtime 仍分別留待 v0.9.6、v0.9.7 與 v1.0。
+
 ## 環境變數
 
 | 變數 | 說明 | 預設 |
 |------|------|------|
-| `OPENROUTER_API_KEY` | OpenRouter API 金鑰 | （必填） |
+| `OPENROUTER_API_KEY` | 只供模型連線的 OpenRouter provider API 金鑰 | （必填） |
+| `COUNCIL_PRINCIPAL_ID` | Council local principal 穩定 ID（audit 只記遮罩 reference） | 本機 OS user |
+| `COUNCIL_PRINCIPAL_SCOPES` | Council tool scopes（逗號分隔、未知值 fail-fast） | 全部五種 scope |
 | `COUNCIL_DEFAULT_PRESET` | 預設 preset 名稱 | `glm-stack` |
 | `COUNCIL_WORKSPACE_ROOT` | Tool 工作區根目錄 | 目前工作目錄 |
 | `COUNCIL_MAX_TOOL_CALLS` | 單次 run 的 tool 呼叫上限 | `50` |

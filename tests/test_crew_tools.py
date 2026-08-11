@@ -8,12 +8,14 @@ from unittest.mock import MagicMock, patch
 from council_agent.config.presets import get_preset_by_name
 from council_agent.crews.execution import build_execution_crew, run_execution
 from council_agent.crews.execution_tools import build_execution_tools
+from council_agent.llm.openrouter import OpenRouterCredential
 from council_agent.sandbox.config import init_sandbox
 from council_agent.sandbox.session import SessionManager
 from council_agent.security import (
     AuditLogger,
     SecurityContext,
     default_audit_events_path,
+    full_scope_principal,
     get_security_context,
     load_audit_events,
     security_context,
@@ -23,6 +25,7 @@ from council_agent.tools import ToolCallTracker, ToolResult, run_command
 from council_agent.types import PlanArtifact
 
 PRESETS_DIR = Path(__file__).resolve().parents[1] / "presets"
+PROVIDER_CREDENTIAL = OpenRouterCredential("fake-key")
 
 
 def _tools_by_name():
@@ -106,7 +109,11 @@ def test_wrapper_without_context_fails_closed(workspace_root: Path) -> None:
 
 def test_tracker_limit_blocks_underlying_call(workspace_root: Path) -> None:
     tracker = ToolCallTracker(max_tool_calls=1)
-    context = SecurityContext.create(workspace_root, tracker=tracker)
+    context = SecurityContext.create(
+        workspace_root,
+        tracker=tracker,
+        principal=full_scope_principal("crew-limit-test", issuer="pytest"),
+    )
     with without_security_context(), security_context(context):
         tools = _tools_by_name()
         tools["write_file"].run(path="a.txt", content="one")
@@ -131,6 +138,7 @@ def test_wrapper_appends_to_session(workspace_root: Path) -> None:
         workspace_root,
         tracker=tracker,
         session=session,
+        principal=full_scope_principal("crew-session-test", issuer="pytest"),
     )
     with without_security_context(), security_context(context):
         tools = _tools_by_name()
@@ -157,6 +165,7 @@ def test_wrapper_appends_to_audit_when_logger_installed(workspace_root: Path) ->
         tracker=tracker,
         session=session,
         audit_logger=logger,
+        principal=full_scope_principal("crew-audit-test", issuer="pytest"),
     )
     with without_security_context(), security_context(context):
         tools = _tools_by_name()
@@ -190,8 +199,9 @@ def test_build_execution_crew_mounts_tools(
     crew_instance = MagicMock()
     mock_crew.return_value = crew_instance
     preset = get_preset_by_name(PRESETS_DIR, "glm-stack")
-    result = build_execution_crew(preset, "fake-key")
+    result = build_execution_crew(preset, PROVIDER_CREDENTIAL)
     assert result is crew_instance
+    assert mock_llm.call_args.args[2] is PROVIDER_CREDENTIAL
 
     kwargs = mock_agent.call_args.kwargs
     tool_names = {t.name for t in kwargs["tools"]}
@@ -217,7 +227,11 @@ def test_build_execution_crew_can_disable_tools(
 ) -> None:
     mock_llm.return_value = MagicMock()
     preset = get_preset_by_name(PRESETS_DIR, "glm-stack")
-    build_execution_crew(preset, "fake-key", enable_tools=False)
+    build_execution_crew(
+        preset,
+        PROVIDER_CREDENTIAL,
+        enable_tools=False,
+    )
     assert mock_agent.call_args.kwargs["tools"] == []
 
 

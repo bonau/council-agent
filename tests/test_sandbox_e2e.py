@@ -11,11 +11,12 @@ import pytest
 from council_agent.config.presets import get_preset_by_name
 from council_agent.config.settings import get_settings
 from council_agent.crews.execution_tools import build_execution_tools
+from council_agent.llm.openrouter import OpenRouterCredential
 from council_agent.orchestrator import run_council
 from council_agent.sandbox.config import apply_workspace_root, init_sandbox
 from council_agent.sandbox.session import SessionManager
 from council_agent.sandbox.workspace import get_workspace_guard
-from council_agent.security import without_security_context
+from council_agent.security import full_scope_principal, without_security_context
 from council_agent.types import (
     PlanArtifact,
     VerdictStatus,
@@ -23,6 +24,8 @@ from council_agent.types import (
 )
 
 PRESETS_DIR = Path(__file__).resolve().parents[1] / "presets"
+PROVIDER_CREDENTIAL = OpenRouterCredential("test-key")
+TEST_PRINCIPAL = full_scope_principal("sandbox-e2e", issuer="pytest")
 
 
 @pytest.fixture(autouse=True)
@@ -31,7 +34,7 @@ def no_default_security_context(workspace_root: Path) -> None:
         yield
 
 
-def _mock_execution_build(preset, api_key, *, enable_tools=True):
+def _mock_execution_build(preset, provider_credential, *, enable_tools=True):
     """Build a fake crew whose kickoff invokes real tool wrappers."""
     assert enable_tools is True
     tools = {t.name: t for t in build_execution_tools()}
@@ -98,7 +101,8 @@ def test_e2e_run_with_sandbox_writes_files_and_session(
         result = run_council(
             "create hello.txt",
             preset,
-            "test-key",
+            PROVIDER_CREDENTIAL,
+            TEST_PRINCIPAL,
             project_root=tmp_path,
         )
 
@@ -182,7 +186,8 @@ def test_e2e_run_with_sandbox_writes_audit_events(
         run_council(
             "create hello.txt",
             preset,
-            "test-key",
+            PROVIDER_CREDENTIAL,
+            TEST_PRINCIPAL,
             project_root=tmp_path,
         )
 
@@ -244,7 +249,12 @@ def test_e2e_run_without_sandbox_skips_session_files(
             return_value=verdict,
         ),
     ):
-        result = run_council("no sandbox", preset, "test-key")
+        result = run_council(
+            "no sandbox",
+            preset,
+            PROVIDER_CREDENTIAL,
+            TEST_PRINCIPAL,
+        )
 
     assert (tmp_path / "hello.txt").exists()
     assert len(result.execution.tool_summaries) == 3
@@ -252,10 +262,9 @@ def test_e2e_run_without_sandbox_skips_session_files(
     assert SessionManager.latest(tmp_path) is None
 
 
-def test_existing_orchestrator_api_still_works_without_kwargs(
+def test_orchestrator_accepts_explicit_credential_and_principal_positionally(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Zero-modification compatibility: positional args only."""
     monkeypatch.setenv("OPENROUTER_API_KEY", "test-key")
     get_settings.cache_clear()
     apply_workspace_root(tmp_path)
@@ -290,7 +299,12 @@ def test_existing_orchestrator_api_still_works_without_kwargs(
             "council_agent.orchestrator.run_verification", return_value=verdict
         ),
     ):
-        result = run_council("compat", preset, "test-key")
+        result = run_council(
+            "compat",
+            preset,
+            PROVIDER_CREDENTIAL,
+            TEST_PRINCIPAL,
+        )
 
     assert result.final_output == "ok"
     assert "tracker" not in mock_exec_build.call_args.kwargs

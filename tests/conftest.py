@@ -9,6 +9,7 @@ import pytest
 from council_agent.config.settings import get_settings
 from council_agent.sandbox.workspace import get_workspace_guard
 from council_agent.security.middleware import SecurityContext, security_context
+from council_agent.security.principal import full_scope_principal
 from council_agent.tools.tracker import ToolCallTracker
 
 
@@ -25,6 +26,7 @@ def workspace_root(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
         tmp_path,
         request_id=f"pytest-{tmp_path.name}",
         tracker=ToolCallTracker(max_tool_calls=1000),
+        principal=full_scope_principal("pytest-suite", issuer="pytest"),
     )
     with security_context(context):
         yield tmp_path
