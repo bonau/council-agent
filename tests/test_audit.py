@@ -160,9 +160,16 @@ def test_filter_and_export(tmp_path: Path) -> None:
 
     out = tmp_path / "out" / "export.jsonl"
     export_audit_events(filtered, out)
-    exported = load_audit_events(out)
+    exported = [
+        json.loads(line)
+        for line in out.read_text(encoding="utf-8").splitlines()
+    ]
     assert len(exported) == 2
-    assert all(e.session_id == "s1" for e in exported)
+    assert all(event["session_id"] == "s1" for event in exported)
+    assert [event["event_id"] for event in exported] == [
+        filtered[0].event_id,
+        filtered[1].event_id,
+    ]
 
 
 def test_recursive_redaction_precedes_truncation_and_preserves_ordinary_values() -> None:
