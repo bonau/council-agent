@@ -354,6 +354,10 @@ def _audit_path_lock(path: Path) -> Iterator[None]:
         descriptor = os.open(lock_path, os.O_CREAT | os.O_RDWR, 0o600)
         try:
             try:
+                os.chmod(lock_path, 0o600)
+            except OSError:
+                pass
+            try:
                 import fcntl
             except ImportError:  # pragma: no cover - non-POSIX fallback
                 fcntl = None  # type: ignore[assignment]
@@ -401,14 +405,20 @@ class AuditLogger:
         self.session_id = session_id
         self.arg_max_chars = arg_max_chars
         self.audit_path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
-        os.chmod(self.audit_path.parent, 0o700)
+        try:
+            os.chmod(self.audit_path.parent, 0o700)
+        except OSError:
+            pass
         descriptor = os.open(
             self.audit_path,
             os.O_CREAT | os.O_APPEND | os.O_WRONLY,
             0o600,
         )
         os.close(descriptor)
-        os.chmod(self.audit_path, 0o600)
+        try:
+            os.chmod(self.audit_path, 0o600)
+        except OSError:
+            pass
 
     def record(
         self,

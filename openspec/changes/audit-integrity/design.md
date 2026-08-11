@@ -22,7 +22,7 @@ See `proposal.md` for motivation. v0.9.2 made middleware the only product eviden
 
 ### 1. Protect named control-plane roots with immutable built-in patterns
 
-`DEFAULT_DENIED_PATTERNS` remains the single base merged into every context guard. It gains root and nested forms for audit, sessions, sandbox config, and reserved auth/grant paths while retaining secrets and policy protection. Root `.council` itself remains listable so normal workspace listing semantics do not change; direct access beneath protected roots is denied. The same guard already backs filesystem operations and supported shell path operands, so no second tool-local deny mechanism is introduced.
+`DEFAULT_DENIED_PATTERNS` remains the single base merged into every context guard. It gains root and nested forms for `.council` and its audit, sessions, sandbox config, and reserved auth/grant paths while retaining secrets and policy protection. Listing the workspace parent still reveals that `.council` exists, but targeting `.council` itself is denied so a recursive directory action cannot bypass child protections. The same guard already backs filesystem operations and supported shell path operands, so no second tool-local deny mechanism is introduced.
 
 Alternative considered: deny all of `.council/**`. That is simpler but prevents future non-control Agent workspace state and changes more behavior than this milestone requires.
 

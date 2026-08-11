@@ -318,6 +318,50 @@ def test_denied_path_has_stable_reason_and_no_process(tmp_path: Path) -> None:
 @pytest.mark.parametrize(
     "command",
     [
+        "cat .council/audit/events.jsonl",
+        "ls .council/sessions",
+        "rm .council/audit/events.jsonl",
+        "cp source.txt .council/audit/copied.txt",
+        "mv source.txt .council/sessions/moved.txt",
+        "touch .council/config.yaml",
+        "mkdir .council/grants/new",
+        "rm -rf .council",
+        "cat nested/.council/audit/events.jsonl",
+    ],
+)
+def test_control_plane_shell_operands_are_refused_without_side_effect(
+    tmp_path: Path,
+    command: str,
+) -> None:
+    audit_file = tmp_path / ".council" / "audit" / "events.jsonl"
+    audit_file.parent.mkdir(parents=True)
+    audit_file.write_text("sentinel\n", encoding="utf-8")
+    sessions = tmp_path / ".council" / "sessions"
+    sessions.mkdir()
+    source = tmp_path / "source.txt"
+    source.write_text("source", encoding="utf-8")
+    nested_audit = tmp_path / "nested" / ".council" / "audit" / "events.jsonl"
+    nested_audit.parent.mkdir(parents=True)
+    nested_audit.write_text("nested-sentinel\n", encoding="utf-8")
+
+    with mock.patch("council_agent.tools.shell.subprocess.run") as run_mock:
+        result = run_command(command)
+
+    assert result.success is False
+    assert result.metadata["rejection_reason"] == "denied_path"
+    assert "exit_code" not in result.metadata
+    assert audit_file.read_text(encoding="utf-8") == "sentinel\n"
+    assert nested_audit.read_text(encoding="utf-8") == "nested-sentinel\n"
+    assert source.read_text(encoding="utf-8") == "source"
+    assert not (tmp_path / ".council" / "audit" / "copied.txt").exists()
+    assert not (sessions / "moved.txt").exists()
+    assert not (tmp_path / ".council" / "grants").exists()
+    run_mock.assert_not_called()
+
+
+@pytest.mark.parametrize(
+    "command",
+    [
         "echo ok; touch marker",
         "echo ok && touch marker",
         "echo ok || touch marker",

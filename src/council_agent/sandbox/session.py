@@ -9,7 +9,13 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from council_agent.sandbox.config import is_sandbox_initialized, sessions_dir
+from council_agent.sandbox.config import (
+    is_sandbox_initialized,
+    secure_control_directory,
+    secure_control_file,
+    sessions_dir,
+)
+from council_agent.security.redaction import sanitize_value
 
 
 def _utc_now_iso() -> str:
@@ -60,17 +66,19 @@ class SessionManager:
 
         session_id = str(uuid.uuid4())
         session_dir = sessions_dir(project) / session_id
-        session_dir.mkdir(parents=True, exist_ok=False)
+        session_dir.mkdir(parents=True, exist_ok=False, mode=0o700)
+        secure_control_directory(session_dir)
 
         meta = SessionMeta(
             session_id=session_id,
-            prompt=prompt,
-            preset=preset,
+            prompt=str(sanitize_value(prompt)),
+            preset=str(sanitize_value(preset)),
             workspace_root=str(workspace),
             started_at=_utc_now_iso(),
         )
         manager = cls(session_dir, meta)
         manager.tools_path.write_text("", encoding="utf-8")
+        secure_control_file(manager.tools_path)
         manager._write_meta()
         return manager
 
@@ -83,19 +91,30 @@ class SessionManager:
         metadata: dict[str, Any] | None = None,
         output: str = "",
         error: str | None = None,
+        request_id: str | None = None,
+        action_id: str | None = None,
+        audit_attempt_event_id: str | None = None,
+        audit_result_event_id: str | None = None,
     ) -> None:
         """Append one JSON object line to tools.jsonl and bump meta count."""
-        record = {
-            "tool": tool,
-            "args": args,
-            "success": success,
-            "metadata": metadata or {},
-            "output": output,
-            "error": error,
-            "timestamp": _utc_now_iso(),
-        }
+        record = sanitize_value(
+            {
+                "tool": tool,
+                "args": args,
+                "success": success,
+                "metadata": metadata or {},
+                "output": output,
+                "error": error,
+                "timestamp": _utc_now_iso(),
+                "request_id": request_id,
+                "action_id": action_id,
+                "audit_attempt_event_id": audit_attempt_event_id,
+                "audit_result_event_id": audit_result_event_id,
+            }
+        )
         with self.tools_path.open("a", encoding="utf-8") as handle:
             handle.write(json.dumps(record, ensure_ascii=False) + "\n")
+        secure_control_file(self.tools_path)
         self.meta.tool_call_count += 1
         self._write_meta()
 
@@ -107,14 +126,20 @@ class SessionManager:
 
     def _write_meta(self) -> None:
         self.meta_path.write_text(
-            json.dumps(asdict(self.meta), ensure_ascii=False, indent=2) + "\n",
+            json.dumps(
+                sanitize_value(asdict(self.meta)),
+                ensure_ascii=False,
+                indent=2,
+            )
+            + "\n",
             encoding="utf-8",
         )
+        secure_control_file(self.meta_path)
 
     @classmethod
     def load(cls, session_dir: Path) -> SessionManager:
         meta_path = Path(session_dir) / "meta.json"
-        data = json.loads(meta_path.read_text(encoding="utf-8"))
+        data = sanitize_value(json.loads(meta_path.read_text(encoding="utf-8")))
         meta = SessionMeta(**data)
         return cls(Path(session_dir), meta)
 
