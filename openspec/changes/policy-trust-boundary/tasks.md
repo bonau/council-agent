@@ -21,7 +21,7 @@
 
 - [x] 4.1 Update README with schema version 1, migration steps, restrict-only semantics, policy-file tool protection, user-owned trust-store separation, and the `run_tests`/OS-containment limitation.
 - [x] 4.2 Update known issues, v1-prep learning log, v0.9.x handoff, and add `docs/releases/v0.9.3-policy-trust-boundary-evidence.md` with rejection, no-side-effect, compatibility, and deferred-scope evidence.
-- [ ] 4.3 Run `uv run pytest` with the full suite after documentation/evidence integration.
+- [x] 4.3 Run `uv run pytest` with the full suite after documentation/evidence integration.
 
 ## 5. Verification, spec sync, and archive readiness
 
