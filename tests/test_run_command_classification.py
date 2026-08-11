@@ -65,7 +65,8 @@ def test_empty_command_rejected() -> None:
         result = run_command("   ")
 
     assert result.success is False
-    assert "Empty" in (result.error or "")
+    assert "empty" in (result.error or "").lower()
+    assert result.metadata.get("rejection_reason") == "unparseable"
     run_mock.assert_not_called()
 
 

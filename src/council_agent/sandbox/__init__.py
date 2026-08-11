@@ -13,6 +13,8 @@ from council_agent.sandbox.config import (
 from council_agent.sandbox.session import SessionManager, SessionMeta
 from council_agent.sandbox.workspace import (
     DEFAULT_DENIED_PATTERNS,
+    DeniedPathError,
+    WorkspaceBoundaryError,
     WorkspaceGuard,
     WorkspaceGuardError,
     get_workspace_guard,
@@ -21,9 +23,11 @@ from council_agent.sandbox.workspace import (
 __all__ = [
     "CouncilConfig",
     "DEFAULT_DENIED_PATTERNS",
+    "DeniedPathError",
     "SessionManager",
     "SessionMeta",
     "WorkspaceGuard",
+    "WorkspaceBoundaryError",
     "WorkspaceGuardError",
     "apply_workspace_root",
     "audit_dir",

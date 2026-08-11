@@ -1,7 +1,8 @@
 """Tests for shell tools."""
 
-import sys
+import subprocess
 from pathlib import Path
+from unittest import mock
 
 from council_agent.tools.shell import run_command
 
@@ -15,16 +16,34 @@ def test_run_command_success() -> None:
 
 
 def test_run_command_failure() -> None:
-    result = run_command(f"{sys.executable} -c \"import sys; sys.exit(42)\"")
+    completed = subprocess.CompletedProcess(
+        args=[],
+        returncode=42,
+        stdout="",
+        stderr="failed",
+    )
+    with mock.patch(
+        "council_agent.tools.shell.subprocess.run",
+        return_value=completed,
+    ):
+        result = run_command("echo hello")
     assert not result.success
     assert result.metadata["exit_code"] == 42
-    assert result.error is not None
+    assert result.error == "failed"
 
 
 def test_run_command_stderr() -> None:
-    result = run_command(
-        f"{sys.executable} -c \"import sys; sys.stderr.write('err'); sys.exit(1)\""
+    completed = subprocess.CompletedProcess(
+        args=[],
+        returncode=1,
+        stdout="",
+        stderr="err",
     )
+    with mock.patch(
+        "council_agent.tools.shell.subprocess.run",
+        return_value=completed,
+    ):
+        result = run_command("echo hello")
     assert not result.success
     assert result.error == "err"
     assert result.metadata["exit_code"] == 1
@@ -32,16 +51,17 @@ def test_run_command_stderr() -> None:
 
 def test_run_command_with_cwd(tmp_path: Path) -> None:
     (tmp_path / "marker.txt").write_text("here", encoding="utf-8")
-    result = run_command("python -c \"import os; print(os.path.exists('marker.txt'))\"", cwd=str(tmp_path))
+    result = run_command("cat marker.txt", cwd=str(tmp_path))
     assert result.success
-    assert result.output == "True"
+    assert result.output == "here"
 
 
 def test_run_command_timeout() -> None:
-    result = run_command(
-        f"{sys.executable} -c \"import time; time.sleep(5)\"",
-        timeout_sec=1,
-    )
+    with mock.patch(
+        "council_agent.tools.shell.subprocess.run",
+        side_effect=subprocess.TimeoutExpired(cmd=["echo"], timeout=1),
+    ):
+        result = run_command("echo hello", timeout_sec=1)
     assert not result.success
     assert result.error is not None
     assert "timed out" in result.error.lower()
