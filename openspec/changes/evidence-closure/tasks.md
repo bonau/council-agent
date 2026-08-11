@@ -1,8 +1,8 @@
 ## 1. Attempt model and deterministic evidence floor
 
-- [ ] 1.1 Add ordered pipeline-attempt, attempt-kind, final stop-reason, and final-result consistency types while preserving existing result accessors.
-- [ ] 1.2 Implement pure current-attempt evidence validation for correlation, explicitly required product tools, and required pytest exit/count evidence.
-- [ ] 1.3 Add focused unit tests for valid evidence, missing/malformed/failed tests, cross-attempt summaries, and text-only compatibility.
+- [x] 1.1 Add ordered pipeline-attempt, attempt-kind, final stop-reason, and final-result consistency types while preserving existing result accessors.
+- [x] 1.2 Implement pure current-attempt evidence validation for correlation, explicitly required product tools, and required pytest exit/count evidence.
+- [x] 1.3 Add focused unit tests for valid evidence, missing/malformed/failed tests, cross-attempt summaries, and text-only compatibility.
 - [ ] 1.4 Run `uv run pytest` and record the all-green phase result before starting boundary wiring.
 
 ## 2. Dispatcher and persistence attempt correlation
