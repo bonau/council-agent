@@ -682,3 +682,10 @@ alpha 才開始實作 Trust Tier 0/1/2 runtime；本紀錄中的 v0.9.x 工作�
 - 文件影響：README、`.env.example`、known issues、v0.9.x handoff、security/sandbox/orchestration delta與本learning log；feature branch不bump package version。
 - Archive：25/25 tasks complete；delta已同步；change移至`openspec/changes/archive/2026-08-11-session-auth/`。
 - 下一步：完成post-archive `./scripts/check.sh`並push final archive revision。
+
+### 2026-08-11 18:59 UTC — v0.9.6 tagged
+
+- 狀態：通過
+- 基準：tag `v0.9.6`
+- 驗證：459 passed
+- 下一步：v0.9.7 trust-grant-store
