@@ -9,11 +9,11 @@
 
 ## 2. Authenticated management and masked audit
 
-- [ ] 2.1 Bind grant/revoke/list to exact one-use `trust-store-management` authentication and enforce `high-risk:manage` or `read` scope before state access/mutation.
-- [ ] 2.2 Enforce self-grant and current-scope subset rules so principal declaration, project policy, confirmation, `--yes`, or workspace content cannot create or expand authority.
-- [ ] 2.3 Emit user-owned canonical audit records for authentication, management, and lookup decisions containing only masked principal, creator, grant, action, resource, store, and correlation references.
-- [ ] 2.4 Add missing/replayed/mismatched/expired/revoked authentication, insufficient-scope, project-policy/workspace bypass, immediate revoke, audit failure, and raw-secret/resource absence tests.
-- [ ] 2.5 Run the focused authentication/audit grant suite and full `uv run pytest` before CLI wiring.
+- [x] 2.1 Bind grant/revoke/list to exact one-use `trust-store-management` authentication and enforce `high-risk:manage` or `read` scope before state access/mutation.
+- [x] 2.2 Enforce self-grant and current-scope subset rules so principal declaration, project policy, confirmation, `--yes`, or workspace content cannot create or expand authority.
+- [x] 2.3 Emit user-owned canonical audit records for authentication, management, and lookup decisions containing only masked principal, creator, grant, action, resource, store, and correlation references.
+- [x] 2.4 Add missing/replayed/mismatched/expired/revoked authentication, insufficient-scope, project-policy/workspace bypass, immediate revoke, audit failure, and raw-secret/resource absence tests.
+- [x] 2.5 Run the focused authentication/audit grant suite and full `uv run pytest` before CLI wiring.
 
 ## 3. Trust CLI foundation
 
