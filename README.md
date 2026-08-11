@@ -15,12 +15,12 @@ OpenRouter + CrewAI 三階段 CLI 框架：每次推論依序經過 **計劃 →
 - 互動確認：危險／寫入 shell 與 `write_file`／`delete_file` 在 CLI 執行時需確認；`--yes` 跳過確認（**不是** Trust Tier 或已驗證授權）；無 TTY 預設拒絕
 - 唯一 Policy Middleware：所有 public tool／CrewAI 呼叫經同一 dispatcher 與單一 `SecurityContext`；缺少或已 cleanup 的 context fail-closed
 - 結構化審計日誌：sandbox 已初始化時，middleware 對每個 tool action 寫入 correlated attempt／result 至 `.council/audit/events.jsonl`；可用 `council audit show`／`export`（尚無 hash chain／secret redaction）
-- 專案政策檔：可選根目錄 `council.policy.yaml`（允許／拒絕指令 pattern、額外敏感路徑）；以 Pydantic 驗證（未知欄位目前會被忽略）
+- 專案政策檔：可選根目錄 `council.policy.yaml`，必須使用 `schema_version: 1`；它是 project-owned、restrict-only 輸入，未知／拼錯／授權型欄位與未支援版本會 fail-fast
 - Tool 呼叫追蹤與 `max_tool_calls` 上限（預設 50）
 - Verification 可接收結構化 tool 執行摘要（含 pytest 結果）
 - 可選 `.council/` sandbox：session 紀錄（`meta.json` + `tools.jsonl`）與跨 session 審計（`audit/events.jsonl`）
 
-> **安全提示**：`run_command` 只接受下述受限 simple grammar，並使用 argv + `shell=False`；這是 command boundary 強化，**不是** OS／容器級 sandbox。v0.9.2 已建立唯一 tool dispatcher，但 `ConfirmMode`／`--yes` **不等於** Trust Tier。可用 `council.policy.yaml` 限縮規則，但政策檔位於 Agent 可寫的專案目錄。仍**不是**完整信任框架（尚無 Trust Tier、`council trust`、principal／scope、authentication、audit hash chain）。請僅在信任的專案目錄與可丟棄環境使用，並避免將不受信任的 prompt 直接餵給 Agent。v1.0 前清債與測試文件見 [docs/index.md](docs/index.md)、[ROADMAP.md](ROADMAP.md)。
+> **安全提示**：`run_command` 只接受下述受限 simple grammar，並使用 argv + `shell=False`；這是 command boundary 強化，**不是** OS／容器級 sandbox。v0.9.2 已建立唯一 tool dispatcher，但 `ConfirmMode`／`--yes` **不等於** Trust Tier。`council.policy.yaml` 只能加限制，不能授權或提權；受控 filesystem tools 與已建模 shell path action 也預設禁止直接存取政策檔。這仍無法阻止 `run_tests` 執行的惡意專案程式碼、host user 或外部程序改檔。系統仍**不是**完整信任框架（尚無 Trust Tier、`council trust`、principal／scope、authentication、user-owned grant store、audit hash chain）。請僅在信任的專案目錄與可丟棄環境使用，並避免將不受信任的 prompt 直接餵給 Agent。v1.0 前清債與測試文件見 [docs/index.md](docs/index.md)、[ROADMAP.md](ROADMAP.md)。
 
 ## Presets
 
@@ -107,7 +107,7 @@ with security_context(context):
     result = read_file("README.md")
 ```
 
-`SecurityContext` 是單次 request snapshot，包含 request/session correlation、workspace guard、project policy snapshot、confirmation policy、tracker，以及可選 session/audit writer。目前 `policy_version="v0.9-unversioned"` 只是 context label，**不是** policy schema version；versioned schema 屬 v0.9.3。
+`SecurityContext` 是單次 request snapshot，包含 request/session correlation、workspace guard、project policy snapshot、confirmation policy、tracker，以及可選 session/audit writer。`policy_version` 由 snapshot 推導：缺少 project policy 時是 `builtin`；有效 `schema_version: 1` policy 時是 `project-policy/v1`。Context 會拒絕 policy 與 label 不一致的組合。
 
 若未安裝 context、scope 已 cleanup、copied context 已 stale，public tool 會回傳 `ToolResult(success=False)` 與穩定的 `security_context_*` refusal，不會合成 compat context 或執行 operation。`tools/` 的 underscore helpers 是內部實作且不從 package export；它們不是支援的 product authorization entry。Python 同 process 的 hostile caller 仍可 introspect private objects，因此 middleware boundary 不是 in-process isolation。
 
@@ -139,9 +139,11 @@ v0.9.1 的相容性改變是刻意的：任意 executable、`python -c`、`uv ru
 
 ### 專案政策檔（`council.policy.yaml`）
 
-可在專案根目錄放置可選的 `council.policy.yaml`，於 `council run` 時載入並覆寫預設規則（缺檔則沿用內建預設；格式錯誤會 fail-fast）：
+可在專案根目錄放置可選的 `council.policy.yaml`，於 `council run` 時載入並**增加限制**（缺檔則沿用內建預設）。Project policy 位於 untrusted workspace，只是 restrict-only filter，不是 scope、authentication、grant、Trust Tier 或 confirmation bypass 的授權來源：
 
 ```yaml
+schema_version: 1
+
 # 非空時作為 shell 指令允許清單（fnmatch，大小寫不敏感）
 allowed_commands:
   - "echo *"
@@ -158,7 +160,11 @@ denied_paths:
   - "secrets/**"
 ```
 
-v0.9 生效欄位僅上列三者。檔案中若出現 `trust_tier` 等未來欄位會被忽略且不驅動行為；Trust Tier／`council trust` 見 ROADMAP v1.0。
+Schema version 1 只接受 `schema_version` 與上列三個限制欄位，且型別採 strict validation。缺少／非整數／未支援的 version、未知欄位、拼錯欄位（例如 `denied_command`）及 `trust_tier`、`grant`、`scope` 等授權型欄位都會在 session、context、crew 建立前拒絕整份檔案；不會只套用認得的部分。錯誤會指出檔案與欄位，但不回顯欄位值。
+
+從舊 v0.9 unversioned policy 遷移時，加入 `schema_version: 1`，並移除所有不在範例中的欄位；不提供靜默相容模式。未來 user-owned trust grant store 會使用 workspace 外、不同權限與載入 API 的邊界（規劃於 v0.9.7），本版未實作 grant store。
+
+`council.policy.yaml` 與巢狀同名 policy 檔預設在 `WorkspaceGuard` denied paths 內，project policy 也不能移除這項 built-in 保護。這會阻擋 public filesystem tools 及受支援、可辨識路徑的 shell action 直接讀寫／刪除政策檔；不代表 OS confinement，尤其 `run_tests` 仍會執行可任意操作 host 權限範圍的專案程式碼。
 
 Policy 在 command analysis 與路徑驗證後、confirmation 前套用。`run_command` pattern 比對 canonical simple command；`run_tests` 的 canonical action 以受信任的目前 Python executable 開頭並包含 `-m pytest`。舊有 `"python -m pytest *"`／`"uv run pytest *"` pattern 不會授權 raw `run_command`（兩者已不在 simple-command registry），需依實際 canonical 表示調整 `run_tests` allowlist。
 
