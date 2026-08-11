@@ -101,7 +101,7 @@ def test_run_command_gate_order_is_fixed(tmp_path: Path) -> None:
             side_effect=evaluate,
         ),
         mock.patch(
-            "council_agent.tools.shell.evaluate_confirmation",
+            "council_agent.tools.shell.evaluate_tier_aware_confirmation",
             side_effect=confirm,
         ),
         mock.patch(
@@ -175,7 +175,7 @@ def test_policy_denial_precedes_confirmation_for_canonical_action() -> None:
     with (
         active_policy(policy),
         mock.patch(
-            "council_agent.tools.shell.evaluate_confirmation"
+            "council_agent.tools.shell.evaluate_tier_aware_confirmation"
         ) as confirm_mock,
         mock.patch("council_agent.tools.shell.subprocess.run") as run_mock,
     ):
@@ -496,7 +496,7 @@ def test_run_tests_policy_precedes_confirmation_and_execution(
     with (
         active_policy(policy),
         mock.patch(
-            "council_agent.tools.shell.evaluate_confirmation"
+            "council_agent.tools.shell.evaluate_tier_aware_confirmation"
         ) as confirm_mock,
         mock.patch("council_agent.tools.shell.subprocess.run") as run_mock,
     ):

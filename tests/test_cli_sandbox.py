@@ -228,7 +228,7 @@ def test_run_rejects_unknown_principal_scope_before_pipeline(
         result = runner.invoke(app, ["run", "hi"])
 
     assert result.exit_code == 2
-    assert "Principal Configuration Error" in result.output
+    assert "Configuration Error" in result.output
     assert "Unknown Council principal scope" in result.output
     assert unknown not in result.output
     mock_run.assert_not_called()

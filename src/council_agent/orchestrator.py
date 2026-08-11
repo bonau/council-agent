@@ -20,6 +20,7 @@ from council_agent.sandbox.config import is_sandbox_initialized
 from council_agent.sandbox.session import SessionManager
 from council_agent.security import (
     AuditLogger,
+    AuthenticationBinding,
     AuthenticationManager,
     ConfirmFn,
     ConfirmMode,
@@ -28,11 +29,17 @@ from council_agent.security import (
     PrincipalResolver,
     SecurityContext,
     ServiceStepUpProvider,
+    TrustGrantStore,
+    TrustStoreError,
+    TrustTier,
     authentication_audit_sink,
     default_audit_events_path,
     load_policy_file,
+    parse_trust_tier,
     pipeline_attempt,
+    principal_may_select_tier2,
     security_context,
+    tier_selection_requires_step_up,
 )
 from council_agent.tools import ToolCallTracker
 from council_agent.types import (
@@ -191,6 +198,7 @@ def run_council(
     confirm_fn: ConfirmFn | None = None,
     principal_resolver: PrincipalResolver | None = None,
     authentication_verifier: SecretStr | None = None,
+    trust_tier: TrustTier | int | str = TrustTier.TIER_1,
 ) -> CouncilResult:
     """Run the full three-phase council pipeline with optional escalation."""
     if not isinstance(provider_credential, OpenRouterCredential):
@@ -206,6 +214,7 @@ def run_council(
             raise TypeError("authentication_verifier must be a SecretStr")
         if not authentication_verifier.get_secret_value():
             raise ValueError("authentication_verifier must be non-empty")
+    selected_tier = parse_trust_tier(trust_tier)
 
     settings = get_settings()
     workspace_root = Path(settings.council_workspace_root).resolve()
@@ -260,6 +269,44 @@ def run_council(
             authentication_verifier,
         )
 
+    if tier_selection_requires_step_up(selected_tier):
+        if not principal_may_select_tier2(principal.scopes):
+            raise ValueError(
+                "Trust Tier 2 requires principal scope high-risk:manage"
+            )
+        if (
+            authentication_manager is None
+            or step_up_provider is None
+            or authentication_verifier is None
+        ):
+            raise ValueError(
+                "Trust Tier 2 requires fresh step-up authentication "
+                "(configure COUNCIL_AUTH_SECRET)"
+            )
+        binding = AuthenticationBinding.for_action(
+            principal,
+            workspace_root,
+            runtime_session_id,
+            "select_trust_tier",
+            {"trust_tier": int(selected_tier)},
+        )
+        token = step_up_provider(binding)
+        if token is None:
+            raise ValueError(
+                "Trust Tier 2 step-up authentication is missing or invalid"
+            )
+        auth_decision = authentication_manager.consume_step_up(token, binding)
+        if not auth_decision.allowed:
+            raise ValueError(
+                "Trust Tier 2 step-up authentication is missing or invalid"
+            )
+
+    trust_grant_store: TrustGrantStore | None
+    try:
+        trust_grant_store = TrustGrantStore(workspace_root)
+    except TrustStoreError:
+        trust_grant_store = None
+
     session_status = "completed"
     try:
         context = SecurityContext.create(
@@ -277,6 +324,8 @@ def run_council(
             authentication_manager=authentication_manager,
             step_up_provider=step_up_provider,
             require_high_risk_step_up=True,
+            trust_tier=selected_tier,
+            trust_grant_store=trust_grant_store,
             session=session,
             audit_logger=audit_logger,
         )
