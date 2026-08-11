@@ -580,7 +580,9 @@ alpha 才開始實作 Trust Tier 0/1/2 runtime；本紀錄中的 v0.9.x 工作�
   - Audit redaction/envelope/tamper/multi-process writer：23 passed。
   - Guard/shell/session/permission：101 passed。
   - Middleware/CLI/sandbox integration：41 passed。
-  - Final regression／strict validation／archive結果待 gate 後回填。
+  - Full regression：375 passed。
+  - Active-change `./scripts/check.sh`：375 passed；changes strict 1/1；main specs strict 5/5；exit code 0。
+  - Archive／post-archive結果待 gate 後回填。
 - 詳細 evidence：[`v0.9.4-audit-integrity-evidence.md`](v0.9.4-audit-integrity-evidence.md)。
 - 剩餘風險／延期責任：
   - Per-event digest不是 predecessor hash chain；沒有 externally signed/anchored head，無法可靠偵測 tail deletion或 whole-log self-consistent replacement。完整 integrity product仍屬 v1.0。

@@ -26,4 +26,4 @@
 - [x] 5.1 Run the complete regression suite with `uv run pytest`.
 - [x] 5.2 Run `npx @fission-ai/openspec@latest validate --changes --strict`.
 - [x] 5.3 Sync all four delta specs into `openspec/specs/` and run `npx @fission-ai/openspec@latest validate --specs --strict`.
-- [ ] 5.4 Run `./scripts/check.sh` with all active-change tasks complete before archiving.
+- [x] 5.4 Run `./scripts/check.sh` with all active-change tasks complete before archiving.
