@@ -16,10 +16,14 @@ from council_agent.llm.openrouter import make_llm
 from council_agent.sandbox.config import is_sandbox_initialized
 from council_agent.sandbox.session import SessionManager
 from council_agent.security import (
+    AuditLogger,
     ConfirmFn,
     ConfirmMode,
     ConfirmationPolicy,
+    default_audit_events_path,
+    reset_audit_logger,
     reset_confirmation_policy,
+    set_audit_logger,
     set_confirmation_policy,
 )
 from council_agent.tools import ToolCallTracker
@@ -168,6 +172,14 @@ def run_council(
     policy_token = set_confirmation_policy(
         ConfirmationPolicy(mode=confirm_mode, confirm_fn=confirm_fn)
     )
+    audit_token = None
+    if session is not None and session_project is not None:
+        audit_logger = AuditLogger(
+            default_audit_events_path(session_project),
+            session_id=session.meta.session_id,
+        )
+        audit_token = set_audit_logger(audit_logger)
+
     session_status = "completed"
     try:
         plan = run_planning(planning_crew, prompt)
@@ -202,6 +214,8 @@ def run_council(
         raise
     finally:
         reset_confirmation_policy(policy_token)
+        if audit_token is not None:
+            reset_audit_logger(audit_token)
         if session is not None:
             # Keep count in sync if tools logged via tracker but finalize late.
             session.meta.tool_call_count = max(
