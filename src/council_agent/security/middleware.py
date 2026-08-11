@@ -12,7 +12,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, Iterator
 
 from council_agent.sandbox.workspace import DEFAULT_DENIED_PATTERNS, WorkspaceGuard
-from council_agent.security.audit import AuditLogger
+from council_agent.security.audit import AuditLogger, AuditRecord
 from council_agent.security.confirm import ConfirmationPolicy
 from council_agent.security.policy import (
     CURRENT_POLICY_SCHEMA_VERSION,
@@ -389,11 +389,12 @@ def _audit(
     action_id: str,
     decision: str | None,
     result: ToolResult | None = None,
-) -> None:
+    attempt_event_id: str | None = None,
+) -> AuditRecord | None:
     logger = context.audit_logger
     if logger is None:
-        return
-    logger.record(
+        return None
+    return logger.record(
         tool,
         args,
         success=None if result is None else result.success,
@@ -404,7 +405,76 @@ def _audit(
         request_id=context.request_id,
         action_id=action_id,
         decision=decision,
+        attempt_event_id=attempt_event_id,
     )
+
+
+def _result_evidence(
+    context: SecurityContext,
+    *,
+    tool: str,
+    args: dict[str, Any],
+    action_id: str,
+    result: ToolResult,
+    attempt: AuditRecord | None,
+) -> AuditRecord | None:
+    completed = _audit(
+        context,
+        phase="result",
+        tool=tool,
+        args=args,
+        action_id=action_id,
+        decision=result.metadata["decision"],
+        result=result,
+        attempt_event_id=None if attempt is None else attempt.event_id,
+    )
+    if context.session is not None:
+        context.session.append_tool_call(
+            tool,
+            args,
+            success=result.success,
+            metadata=result.metadata,
+            output=result.output,
+            error=result.error,
+            request_id=context.request_id,
+            action_id=action_id,
+            audit_attempt_event_id=None if attempt is None else attempt.event_id,
+            audit_result_event_id=(
+                None if completed is None else completed.event_id
+            ),
+        )
+    return completed
+
+
+def _finalize_evidence(
+    context: SecurityContext,
+    *,
+    tool: str,
+    args: dict[str, Any],
+    action_id: str,
+    result: ToolResult,
+    attempt: AuditRecord | None,
+) -> ToolResult:
+    try:
+        _result_evidence(
+            context,
+            tool=tool,
+            args=args,
+            action_id=action_id,
+            result=result,
+            attempt=attempt,
+        )
+    except Exception:
+        return _with_correlation(
+            _err(
+                "Durable result evidence could not be persisted",
+                rejection_reason="audit_failure",
+            ),
+            context,
+            action_id,
+            "deny",
+        )
+    return result
 
 
 def _context_refusal(error: SecurityContextError) -> ToolResult:
@@ -420,6 +490,26 @@ def invoke(tool_name: str, **tool_args: Any) -> ToolResult:
     except SecurityContextError as exc:
         return _context_refusal(exc)
 
+    try:
+        attempt = _audit(
+            context,
+            phase="attempt",
+            tool=tool_name,
+            args=tool_args,
+            action_id=action_id,
+            decision=None,
+        )
+    except Exception:
+        return _with_correlation(
+            _err(
+                "Durable attempt evidence could not be persisted",
+                rejection_reason="audit_failure",
+            ),
+            context,
+            action_id,
+            "deny",
+        )
+
     handler = _TOOL_HANDLERS.get(tool_name)
     if handler is None:
         result = _with_correlation(
@@ -431,43 +521,13 @@ def invoke(tool_name: str, **tool_args: Any) -> ToolResult:
             action_id,
             "deny",
         )
-        _audit(
+        return _finalize_evidence(
             context,
-            phase="attempt",
             tool=tool_name,
             args=tool_args,
             action_id=action_id,
-            decision=None,
-        )
-        _audit(
-            context,
-            phase="result",
-            tool=tool_name,
-            args=tool_args,
-            action_id=action_id,
-            decision="deny",
             result=result,
-        )
-        return result
-
-    try:
-        _audit(
-            context,
-            phase="attempt",
-            tool=tool_name,
-            args=tool_args,
-            action_id=action_id,
-            decision=None,
-        )
-    except Exception as exc:
-        return _with_correlation(
-            _err(
-                f"Audit attempt failed: {exc}",
-                rejection_reason="audit_failure",
-            ),
-            context,
-            action_id,
-            "deny",
+            attempt=attempt,
         )
 
     if len(context.tracker.summaries) >= context.tracker.max_tool_calls:
@@ -483,16 +543,14 @@ def invoke(tool_name: str, **tool_args: Any) -> ToolResult:
             action_id,
             "deny",
         )
-        _audit(
+        return _finalize_evidence(
             context,
-            phase="result",
             tool=tool_name,
             args=tool_args,
             action_id=action_id,
-            decision="deny",
             result=result,
+            attempt=attempt,
         )
-        return result
 
     try:
         raw_result = handler(context, **tool_args)
@@ -518,23 +576,11 @@ def invoke(tool_name: str, **tool_args: Any) -> ToolResult:
             "deny",
         )
 
-    if context.session is not None:
-        context.session.append_tool_call(
-            tool_name,
-            tool_args,
-            success=result.success,
-            metadata=result.metadata,
-            output=result.output,
-            error=result.error,
-        )
-
-    _audit(
+    return _finalize_evidence(
         context,
-        phase="result",
         tool=tool_name,
         args=tool_args,
         action_id=action_id,
-        decision=result.metadata["decision"],
         result=result,
+        attempt=attempt,
     )
-    return result

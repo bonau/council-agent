@@ -21,10 +21,13 @@ from council_agent.sandbox.config import (
 )
 from council_agent.sandbox.session import SessionManager
 from council_agent.security import (
+    AuditIntegrityError,
+    AuditIntegrityReport,
+    AuditRecord,
     default_audit_events_path,
     export_audit_events,
     filter_audit_events,
-    load_audit_events,
+    load_audit_events_with_integrity,
     resolve_cli_confirm_mode,
 )
 
@@ -167,6 +170,22 @@ def _resolve_audit_project(workspace: Path | None) -> Path:
     return Path(workspace).resolve() if workspace is not None else Path.cwd()
 
 
+def _load_validated_audit(
+    events_path: Path,
+) -> tuple[list[AuditRecord], AuditIntegrityReport]:
+    try:
+        return load_audit_events_with_integrity(events_path)
+    except AuditIntegrityError as exc:
+        console.print(
+            Panel(
+                str(exc),
+                title="Audit Integrity Error",
+                border_style="red",
+            )
+        )
+        raise typer.Exit(code=1) from exc
+
+
 @audit_app.command("show")
 def audit_show(
     limit: int = typer.Option(
@@ -196,8 +215,9 @@ def audit_show(
     """Display recent structured audit events."""
     project = _resolve_audit_project(workspace)
     events_path = default_audit_events_path(project)
+    all_events, integrity = _load_validated_audit(events_path)
     events = filter_audit_events(
-        load_audit_events(events_path),
+        all_events,
         session_id=session,
     )
 
@@ -209,7 +229,8 @@ def audit_show(
                     f"\nFilter session={session}"
                     if session
                     else f"\nLog: {events_path}"
-                ),
+                )
+                + f"\nIntegrity: {integrity.status}",
                 title="Audit Show",
                 border_style="yellow",
             )
@@ -218,19 +239,38 @@ def audit_show(
 
     # Show the most recent `limit` events while preserving chronological order.
     shown = events[-limit:]
-    table = Table(title=f"Audit events ({len(shown)} of {len(events)})")
+    table = Table(
+        title=(
+            f"Audit events ({len(shown)} of {len(events)}; "
+            f"integrity={integrity.status})"
+        )
+    )
+    table.add_column("Seq", justify="right")
     table.add_column("Timestamp", style="dim")
     table.add_column("Tool", style="cyan")
+    table.add_column("Phase")
     table.add_column("Success")
     table.add_column("Session")
+    table.add_column("Event ID", overflow="fold")
+    table.add_column("Attempt ID", overflow="fold")
     table.add_column("Error", overflow="fold")
 
     for event in shown:
         table.add_row(
+            str(event.sequence) if event.sequence is not None else "-",
             event.timestamp,
             event.tool,
-            "yes" if event.success else "no",
+            event.phase,
+            (
+                "pending"
+                if event.success is None
+                else "yes"
+                if event.success
+                else "no"
+            ),
             event.session_id or "-",
+            event.event_id or "-",
+            event.attempt_event_id or "-",
             event.error or "",
         )
 
@@ -273,8 +313,9 @@ def audit_export(
 
     project = _resolve_audit_project(workspace)
     events_path = default_audit_events_path(project)
+    all_events, integrity = _load_validated_audit(events_path)
     events = filter_audit_events(
-        load_audit_events(events_path),
+        all_events,
         session_id=session,
     )
     dest = export_audit_events(events, output, format=fmt)
@@ -282,6 +323,7 @@ def audit_export(
         Panel(
             f"[bold]Exported:[/bold] {len(events)} event(s)\n"
             f"[bold]Format:[/bold] {fmt}\n"
+            f"[bold]Integrity:[/bold] {integrity.status}\n"
             f"[bold]Output:[/bold] {dest.resolve()}",
             title="Audit Export",
             border_style="green",

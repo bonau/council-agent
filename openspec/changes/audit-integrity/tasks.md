@@ -8,12 +8,12 @@
 
 - [x] 2.1 Add immutable root/nested built-in denied patterns for audit, sessions, sandbox config, reserved auth/grant paths, and retain project-policy protection across filesystem and recognized shell operands.
 - [x] 2.2 Apply owner-only control-plane modes where supported and sanitize session metadata/tool records while retaining request/action/audit event linkage.
-- [ ] 2.3 Add no-side-effect filesystem/shell sentinel, session redaction/linkage, nested-control-path, policy-non-removal, and permission tests; run `uv run pytest tests/test_workspace_guard.py tests/test_shell_containment.py tests/test_sandbox_session.py`.
+- [x] 2.3 Add no-side-effect filesystem/shell sentinel, session redaction/linkage, nested-control-path, policy-non-removal, and permission tests; run `uv run pytest tests/test_workspace_guard.py tests/test_shell_containment.py tests/test_sandbox_session.py`.
 
 ## 3. Middleware and CLI integration
 
-- [ ] 3.1 Strengthen middleware so every durable result references its exact attempt event and session evidence receives the same request/action and attempt/result IDs.
-- [ ] 3.2 Make audit show/export report `empty`, `verified`, or `legacy_unverified`, sanitize output, and fail explicitly without exporting invalid history.
+- [x] 3.1 Strengthen middleware so every durable result references its exact attempt event and session evidence receives the same request/action and attempt/result IDs.
+- [x] 3.2 Make audit show/export report `empty`, `verified`, or `legacy_unverified`, sanitize output, and fail explicitly without exporting invalid history.
 - [ ] 3.3 Add middleware and CLI integration tests for success/denial correlation, audit-attempt failure, secret-safe persistence/export, integrity status, and invalid-log refusal; run `uv run pytest tests/test_policy_middleware.py tests/test_policy_middleware_tools.py tests/test_cli_audit.py tests/test_sandbox_e2e.py`.
 
 ## 4. Evidence and handoff
