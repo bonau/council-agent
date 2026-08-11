@@ -852,3 +852,11 @@ alpha 才開始實作 Trust Tier 0/1/2 runtime；本紀錄中的 v0.9.x 工作�
 - 驗證：release check 577 passed；beta smoke（tier/grant/shell）PASS
 - 決策：凍結 Tier／matrix-v2／principal／grant／auth／audit contracts；beta 不加新安全語意
 - 下一步：release/1.0.0b1 → tag `v1.0.0-beta.1`
+
+### 2026-08-11 23:15 UTC — v1.0.0-beta.1 tagged；序列停止
+
+- 狀態：通過（停止於 beta）
+- 基準：tag `v1.0.0-beta.1`、package `1.0.0b1`
+- 驗證：577 passed；schema freeze + beta smoke evidence
+- 決策：不開 GA／predecessor hash chain
+- 下一步：等待後續指令（GA 或缺陷修正）
