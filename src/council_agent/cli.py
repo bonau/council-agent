@@ -664,8 +664,9 @@ def run(
         "--yes",
         "-y",
         help=(
-            "Skip confirmation prompts for dangerous/write operations (CI); "
-            "does not grant scopes or authenticate."
+            "Skip interaction prompts for dangerous/write operations (CI) only; "
+            "does not grant scopes, authenticate, create a trust grant, or "
+            "elevate privilege."
         ),
     ),
 ) -> None:

@@ -10,13 +10,13 @@
 - [x] 2.1 Normalize existing policy, scope, authentication, action-risk, and confirmation results at the mandatory dispatcher; set v0.9.8 product grant state explicitly to not required.
 - [x] 2.2 Attach one namespaced matrix version/vector/outcome/reason to result, tracker, session, and audit evidence without replacing detailed legacy evidence.
 - [x] 2.3 Add library tests for policy/scope/authentication/grant-contract/risk/interaction precedence, `AUTO` bypass resistance, stable reasons, ordinary operation failures, audit consistency, and no side effects.
-- [ ] 2.4 Run dispatcher-focused tests and full `uv run pytest` before framework/CLI integration.
+- [x] 2.4 Run dispatcher-focused tests and full `uv run pytest` before framework/CLI integration.
 
 ## 3. Crew and CLI integration
 
-- [ ] 3.1 Keep Crew adapters formatting-only and verify direct library and Crew actions under equivalent contexts produce identical dispatcher matrix evidence.
-- [ ] 3.2 Update `council run --yes` help to state that it skips prompts only and cannot create scopes, authentication, grants, or privilege.
-- [ ] 3.3 Add CLI-resolved context and end-to-end tests proving `--yes`/`AUTO` cannot override scope, authentication, policy, or invalid-grant matrix states and that no `--trust-tier` option exists.
+- [x] 3.1 Keep Crew adapters formatting-only and verify direct library and Crew actions under equivalent contexts produce identical dispatcher matrix evidence.
+- [x] 3.2 Update `council run --yes` help to state that it skips prompts only and cannot create scopes, authentication, grants, or privilege.
+- [x] 3.3 Add CLI-resolved context and end-to-end tests proving `--yes`/`AUTO` cannot override scope, authentication, policy, or invalid-grant matrix states and that no `--trust-tier` option exists.
 - [ ] 3.4 Run Crew/CLI-focused tests and full `uv run pytest` before documentation/evidence work.
 
 ## 4. Documentation and evidence
