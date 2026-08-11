@@ -28,7 +28,7 @@
 
 ## 5. Verification, sync, and archive
 
-- [ ] 5.1 Run `uv run pytest` and record the full passing test count.
+- [x] 5.1 Run `uv run pytest` and record the full passing test count.
 - [ ] 5.2 Run `npx @fission-ai/openspec@latest validate --changes --strict`.
 - [ ] 5.3 Sync the security, tools, and orchestration deltas into main specs.
 - [ ] 5.4 Run `npx @fission-ai/openspec@latest validate --specs --strict`.
