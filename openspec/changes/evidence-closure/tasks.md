@@ -28,11 +28,11 @@
 - [x] 4.3 Close V1-010／SEC-P1-002 and V1-011 documentation debt with accurate residual limitations in known issues and the learning log.
 - [x] 4.4 Correct public testing handbook, manual cases, smoke suite, issue template/index references to the actual v0.9.9 candidate boundary.
 - [x] 4.5 Create `docs/releases/v0.9.9-evidence-closure-evidence.md` and update `docs/releases/v0.9.x-handoff.md` with the explicit v0.9.1–v0.9.9 completion/stop statement, branch, tests, archive plan, and release-branch-only version bump.
-- [ ] 4.6 Run `uv run pytest` and record the all-green documentation/e2e phase result.
+- [x] 4.6 Run `uv run pytest` and record the all-green documentation/e2e phase result.
 
 ## 5. Verification, sync, and archive
 
-- [ ] 5.1 Run `uv run pytest`.
+- [x] 5.1 Run `uv run pytest`.
 - [ ] 5.2 Run `npx @fission-ai/openspec@latest validate --changes --strict`.
 - [ ] 5.3 Sync the four delta specs into `openspec/specs/` and run `npx @fission-ai/openspec@latest validate --specs --strict`.
 - [ ] 5.4 Run `./scripts/check.sh` with the active change and record the test/spec counts in the evidence and learning log.

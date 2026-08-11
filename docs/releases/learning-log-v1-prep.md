@@ -801,7 +801,7 @@ alpha 才開始實作 Trust Tier 0/1/2 runtime；本紀錄中的 v0.9.x 工作�
   - Types/evidence floor：562 passed。
   - Dispatcher/session/audit correlation：562 passed。
   - Escalation integration首次565 passed／1 failed，找到legacy no-attempt `run_execution` summary compatibility；修正並推送後566 passed。
-  - E2E/docs與active/post-archive full gate待下方final紀錄回填。
+  - E2E/docs phase：568 passed；active/post-archive full gate待下方final紀錄回填。
 - 文件影響（V1-011）：
   - README／ROADMAP／known issues／handoff與`docs/testing/`已把current candidate和歷史v0.9.0 expected failures分離。
   - Current claims包括fail-closed simple grammar、mandatory dispatcher、principal/auth/grant-store foundation/matrix、redacted sequenced per-event audit與attempt closure。
