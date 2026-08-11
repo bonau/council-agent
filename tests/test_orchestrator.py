@@ -254,3 +254,153 @@ def test_run_council_without_sandbox_skips_audit_logger(
     assert seen == [True]
     assert get_audit_logger() is None
     assert not (tmp_path / ".council" / "audit").exists()
+
+
+@patch("council_agent.orchestrator.build_planning_crew")
+@patch("council_agent.orchestrator.build_execution_crew")
+@patch("council_agent.orchestrator.build_verification_crew")
+def test_run_council_installs_and_resets_project_policy(
+    mock_verify_build: MagicMock,
+    mock_exec_build: MagicMock,
+    mock_plan_build: MagicMock,
+    tmp_path,
+    monkeypatch,
+) -> None:
+    from pathlib import Path
+
+    from council_agent.sandbox.config import apply_workspace_root
+    from council_agent.security import get_active_policy
+
+    monkeypatch.setenv("OPENROUTER_API_KEY", "test-key")
+    apply_workspace_root(tmp_path)
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "council.policy.yaml").write_text(
+        "denied_commands:\n  - \"curl *\"\n",
+        encoding="utf-8",
+    )
+
+    preset = get_preset_by_name(PRESETS_DIR, "glm-stack")
+    plan = PlanArtifact(raw="{}", steps=["a"], success_criteria=[], risks=[])
+    execution = ExecutionResult(raw="result")
+    verdict = VerificationVerdict(
+        status=VerdictStatus.PASS,
+        raw="{}",
+        issues=[],
+        summary="ok",
+    )
+    seen_denied: list[list[str]] = []
+
+    def _capture_exec(*_args, **_kwargs):
+        policy = get_active_policy()
+        assert policy is not None
+        seen_denied.append(list(policy.denied_commands))
+        return execution
+
+    with (
+        patch("council_agent.orchestrator.run_planning", return_value=plan),
+        patch(
+            "council_agent.orchestrator.run_execution",
+            side_effect=_capture_exec,
+        ),
+        patch("council_agent.orchestrator.run_verification", return_value=verdict),
+    ):
+        run_council(
+            "policy probe",
+            preset,
+            "fake-key",
+            project_root=Path(tmp_path),
+        )
+
+    assert seen_denied == [["curl *"]]
+    assert get_active_policy() is None
+
+
+@patch("council_agent.orchestrator.build_planning_crew")
+@patch("council_agent.orchestrator.build_execution_crew")
+@patch("council_agent.orchestrator.build_verification_crew")
+def test_run_council_invalid_policy_fails_before_crews(
+    mock_verify_build: MagicMock,
+    mock_exec_build: MagicMock,
+    mock_plan_build: MagicMock,
+    tmp_path,
+    monkeypatch,
+) -> None:
+    from pathlib import Path
+
+    import pytest
+
+    from council_agent.sandbox.config import apply_workspace_root
+    from council_agent.security import PolicyValidationError
+
+    monkeypatch.setenv("OPENROUTER_API_KEY", "test-key")
+    apply_workspace_root(tmp_path)
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "council.policy.yaml").write_text(
+        "denied_commands: not-a-list\n",
+        encoding="utf-8",
+    )
+
+    preset = get_preset_by_name(PRESETS_DIR, "glm-stack")
+
+    with (
+        patch("council_agent.orchestrator.run_planning") as mock_plan_run,
+        patch("council_agent.orchestrator.run_execution") as mock_exec_run,
+        patch("council_agent.orchestrator.run_verification") as mock_verify_run,
+    ):
+        with pytest.raises(PolicyValidationError):
+            run_council(
+                "bad policy",
+                preset,
+                "fake-key",
+                project_root=Path(tmp_path),
+            )
+
+    mock_plan_run.assert_not_called()
+    mock_exec_run.assert_not_called()
+    mock_verify_run.assert_not_called()
+
+
+@patch("council_agent.orchestrator.build_planning_crew")
+@patch("council_agent.orchestrator.build_execution_crew")
+@patch("council_agent.orchestrator.build_verification_crew")
+def test_run_council_missing_policy_uses_defaults(
+    mock_verify_build: MagicMock,
+    mock_exec_build: MagicMock,
+    mock_plan_build: MagicMock,
+    tmp_path,
+    monkeypatch,
+) -> None:
+    from council_agent.sandbox.config import apply_workspace_root
+    from council_agent.security import get_active_policy
+
+    monkeypatch.setenv("OPENROUTER_API_KEY", "test-key")
+    apply_workspace_root(tmp_path)
+    monkeypatch.chdir(tmp_path)
+
+    preset = get_preset_by_name(PRESETS_DIR, "glm-stack")
+    plan = PlanArtifact(raw="{}", steps=["a"], success_criteria=[], risks=[])
+    execution = ExecutionResult(raw="result")
+    verdict = VerificationVerdict(
+        status=VerdictStatus.PASS,
+        raw="{}",
+        issues=[],
+        summary="ok",
+    )
+    seen: list[bool] = []
+
+    def _capture_exec(*_args, **_kwargs):
+        seen.append(get_active_policy() is None)
+        return execution
+
+    with (
+        patch("council_agent.orchestrator.run_planning", return_value=plan),
+        patch(
+            "council_agent.orchestrator.run_execution",
+            side_effect=_capture_exec,
+        ),
+        patch("council_agent.orchestrator.run_verification", return_value=verdict),
+    ):
+        run_council("no policy file", preset, "fake-key")
+
+    assert seen == [True]
+    assert get_active_policy() is None

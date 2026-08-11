@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from council_agent.security import CouncilPolicy, active_policy
 from council_agent.tools.filesystem import read_file, write_file
 from council_agent.tools.shell import run_command
 
@@ -26,6 +27,17 @@ def test_write_file_rejects_denied_path(tmp_path: Path) -> None:
     assert result.error is not None
     assert "denied" in result.error.lower()
     assert not (tmp_path / ".env").exists()
+
+
+def test_read_file_rejects_policy_denied_path(tmp_path: Path) -> None:
+    secrets = tmp_path / "secrets"
+    secrets.mkdir()
+    (secrets / "token.txt").write_text("secret", encoding="utf-8")
+    with active_policy(CouncilPolicy(denied_paths=["secrets/**"])):
+        result = read_file("secrets/token.txt")
+    assert not result.success
+    assert result.error is not None
+    assert "denied" in result.error.lower()
 
 
 def test_run_command_rejects_cwd_outside_workspace() -> None:
