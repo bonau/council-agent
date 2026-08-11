@@ -13,8 +13,8 @@
 
 ## 3. Product tool policy-file protection
 
-- [ ] 3.1 Add root and nested `council.policy.yaml` patterns to the immutable built-in `WorkspaceGuard` denylist.
-- [ ] 3.2 Add `tmp_path` tests proving root/nested guard denial, policy inability to remove protection, and public filesystem/supported shell mutation refusal with unchanged policy-file sentinel.
+- [x] 3.1 Add root and nested `council.policy.yaml` patterns to the immutable built-in `WorkspaceGuard` denylist.
+- [x] 3.2 Add `tmp_path` tests proving root/nested guard denial, policy inability to remove protection, and public filesystem/supported shell mutation refusal with unchanged policy-file sentinel.
 - [ ] 3.3 Run `uv run pytest` with the full suite before documentation and end-to-end evidence.
 
 ## 4. Documentation and compatibility evidence

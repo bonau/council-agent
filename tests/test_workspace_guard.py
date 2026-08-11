@@ -97,6 +97,49 @@ def test_resolve_denied_council_secrets(guard: WorkspaceGuard, tmp_path: Path) -
         guard.resolve(".council/secrets/api.key")
 
 
+def test_resolve_denied_root_project_policy(
+    guard: WorkspaceGuard,
+    tmp_path: Path,
+) -> None:
+    (tmp_path / "council.policy.yaml").write_text(
+        "schema_version: 1\n",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(DeniedPathError, match="council.policy.yaml"):
+        guard.resolve("council.policy.yaml")
+
+
+def test_resolve_denied_nested_project_policy(
+    guard: WorkspaceGuard,
+    tmp_path: Path,
+) -> None:
+    nested = tmp_path / "nested"
+    nested.mkdir()
+    (nested / "council.policy.yaml").write_text(
+        "schema_version: 1\n",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(DeniedPathError, match="nested/council.policy.yaml"):
+        guard.resolve("nested/council.policy.yaml")
+
+
+def test_project_policy_cannot_remove_its_builtin_protection(
+    guard: WorkspaceGuard,
+    tmp_path: Path,
+) -> None:
+    (tmp_path / "council.policy.yaml").write_text(
+        "schema_version: 1\n",
+        encoding="utf-8",
+    )
+    policy = CouncilPolicy(schema_version=1, denied_paths=[])
+
+    with active_policy(policy):
+        with pytest.raises(DeniedPathError, match="council.policy.yaml"):
+            guard.resolve("council.policy.yaml")
+
+
 def test_resolve_new_file_in_workspace(guard: WorkspaceGuard) -> None:
     resolved = guard.resolve("new/nested/file.txt")
     assert resolved.name == "file.txt"
