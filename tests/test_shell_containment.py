@@ -18,6 +18,7 @@ from council_agent.security import (
     PolicyCommandDecision,
     active_policy,
     confirmation_policy,
+    get_security_context,
 )
 from council_agent.security.classifier import classify_command as analyze_command
 from council_agent.tools.shell import run_command, run_tests
@@ -53,17 +54,16 @@ def test_run_command_submits_resolved_argv_with_shell_false(tmp_path: Path) -> N
 
 def test_run_command_gate_order_is_fixed(tmp_path: Path) -> None:
     events: list[str] = []
+    context = get_security_context()
+    assert context is not None
 
-    class RecordingGuard:
-        root = tmp_path.resolve()
+    def resolve_cwd(cwd: str | None) -> Path:
+        events.append("cwd")
+        return tmp_path.resolve()
 
-        def resolve_cwd(self, cwd: str | None) -> Path:
-            events.append("cwd")
-            return self.root
-
-        def resolve_from(self, cwd: Path, operand: str) -> Path:
-            events.append(f"operand:{operand}")
-            return cwd / operand
+    def resolve_from(cwd: Path, operand: str) -> Path:
+        events.append(f"operand:{operand}")
+        return cwd / operand
 
     def analyze(command: str):
         events.append("analysis")
@@ -73,7 +73,10 @@ def test_run_command_gate_order_is_fixed(tmp_path: Path) -> None:
         events.append("executable")
         return f"/trusted/{executable}"
 
-    def evaluate(command: str) -> PolicyCommandDecision:
+    def evaluate(
+        command: str,
+        _policy: CouncilPolicy | None,
+    ) -> PolicyCommandDecision:
         events.append(f"policy:{command}")
         return PolicyCommandDecision(allowed=True)
 
@@ -86,21 +89,19 @@ def test_run_command_gate_order_is_fixed(tmp_path: Path) -> None:
         return _completed()
 
     with (
-        mock.patch(
-            "council_agent.tools.shell.get_workspace_guard",
-            return_value=RecordingGuard(),
-        ),
+        mock.patch.object(context.workspace, "resolve_cwd", side_effect=resolve_cwd),
+        mock.patch.object(context.workspace, "resolve_from", side_effect=resolve_from),
         mock.patch("council_agent.tools.shell.classify_command", side_effect=analyze),
         mock.patch(
             "council_agent.tools.shell.shutil.which",
             side_effect=resolve_executable,
         ),
         mock.patch(
-            "council_agent.tools.shell.evaluate_command_policy",
+            "council_agent.tools.shell.evaluate_command",
             side_effect=evaluate,
         ),
         mock.patch(
-            "council_agent.tools.shell.require_confirmation",
+            "council_agent.tools.shell.evaluate_confirmation",
             side_effect=confirm,
         ),
         mock.patch(
@@ -139,7 +140,10 @@ def test_parser_refusals_never_start_subprocess(command: str, reason: str) -> No
         result = run_command(command)
 
     assert not result.success
-    assert result.metadata == {"rejection_reason": reason}
+    assert result.metadata["rejection_reason"] == reason
+    assert result.metadata["decision"] == "deny"
+    assert result.metadata["request_id"]
+    assert result.metadata["action_id"]
     assert "exit_code" not in result.metadata
     run_mock.assert_not_called()
 
@@ -168,7 +172,7 @@ def test_policy_denial_precedes_confirmation_for_canonical_action() -> None:
     with (
         active_policy(policy),
         mock.patch(
-            "council_agent.tools.shell.require_confirmation"
+            "council_agent.tools.shell.evaluate_confirmation"
         ) as confirm_mock,
         mock.patch("council_agent.tools.shell.subprocess.run") as run_mock,
     ):
@@ -445,7 +449,7 @@ def test_run_tests_policy_precedes_confirmation_and_execution(
     with (
         active_policy(policy),
         mock.patch(
-            "council_agent.tools.shell.require_confirmation"
+            "council_agent.tools.shell.evaluate_confirmation"
         ) as confirm_mock,
         mock.patch("council_agent.tools.shell.subprocess.run") as run_mock,
     ):
