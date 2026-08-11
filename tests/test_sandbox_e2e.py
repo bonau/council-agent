@@ -15,6 +15,7 @@ from council_agent.orchestrator import run_council
 from council_agent.sandbox.config import apply_workspace_root, init_sandbox
 from council_agent.sandbox.session import SessionManager
 from council_agent.sandbox.workspace import get_workspace_guard
+from council_agent.security import without_security_context
 from council_agent.types import (
     PlanArtifact,
     VerdictStatus,
@@ -22,6 +23,12 @@ from council_agent.types import (
 )
 
 PRESETS_DIR = Path(__file__).resolve().parents[1] / "presets"
+
+
+@pytest.fixture(autouse=True)
+def no_default_security_context(workspace_root: Path) -> None:
+    with without_security_context():
+        yield
 
 
 def _mock_execution_build(preset, api_key, *, tracker=None, session=None):
