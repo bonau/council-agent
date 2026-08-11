@@ -12,6 +12,15 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, Iterator
 
 from council_agent.sandbox.workspace import DEFAULT_DENIED_PATTERNS, WorkspaceGuard
+from council_agent.security.authentication import (
+    AuthenticationBinding,
+    AuthenticationDecision,
+    AuthenticationManager,
+    AuthenticationReason,
+    StepUpProvider,
+    denied_authentication,
+    not_required_decision,
+)
 from council_agent.security.audit import AuditLogger, AuditRecord
 from council_agent.security.confirm import ConfirmationPolicy
 from council_agent.security.policy import (
@@ -22,6 +31,7 @@ from council_agent.security.principal import (
     AuthorizationReason,
     Principal,
     PrincipalResolver,
+    PrincipalScope,
     ScopeDecision,
     evaluate_principal_scopes,
     required_scopes_for_action,
@@ -118,6 +128,17 @@ class SecurityContext:
         repr=False,
         compare=False,
     )
+    authentication_manager: AuthenticationManager | None = field(
+        default=None,
+        repr=False,
+        compare=False,
+    )
+    step_up_provider: StepUpProvider | None = field(
+        default=None,
+        repr=False,
+        compare=False,
+    )
+    require_high_risk_step_up: bool = False
     session_id: str | None = None
     session: SessionManager | None = None
     audit_logger: AuditLogger | None = None
@@ -140,6 +161,9 @@ class SecurityContext:
         tracker: ToolCallTracker | None = None,
         principal: Principal | None = None,
         principal_resolver: PrincipalResolver | None = None,
+        authentication_manager: AuthenticationManager | None = None,
+        step_up_provider: StepUpProvider | None = None,
+        require_high_risk_step_up: bool = False,
         session: SessionManager | None = None,
         audit_logger: AuditLogger | None = None,
     ) -> SecurityContext:
@@ -150,6 +174,8 @@ class SecurityContext:
             resolved_session_id = session.meta.session_id
         if resolved_session_id is None and audit_logger is not None:
             resolved_session_id = audit_logger.session_id
+        if resolved_session_id is None:
+            resolved_session_id = str(uuid.uuid4())
 
         context = cls(
             request_id=request_id or str(uuid.uuid4()),
@@ -159,6 +185,9 @@ class SecurityContext:
             tracker=tracker if tracker is not None else ToolCallTracker(),
             principal=principal,
             principal_resolver=principal_resolver,
+            authentication_manager=authentication_manager,
+            step_up_provider=step_up_provider,
+            require_high_risk_step_up=require_high_risk_step_up,
             session_id=resolved_session_id,
             session=session,
             audit_logger=audit_logger,
@@ -191,6 +220,11 @@ class SecurityContext:
                 "Security context tracker is invalid",
                 SecurityContextReason.INVALID,
             )
+        if not isinstance(self.session_id, str) or not self.session_id.strip():
+            raise SecurityContextError(
+                "Security context session_id must be non-empty",
+                SecurityContextReason.INVALID,
+            )
         if self.principal is not None:
             if not isinstance(self.principal, Principal):
                 raise SecurityContextError(
@@ -215,6 +249,24 @@ class SecurityContext:
                     "Security context principal resolver requires a bound principal",
                     SecurityContextReason.INVALID,
                 )
+        if (
+            self.authentication_manager is not None
+            and not isinstance(self.authentication_manager, AuthenticationManager)
+        ):
+            raise SecurityContextError(
+                "Security context authentication manager is invalid",
+                SecurityContextReason.INVALID,
+            )
+        if self.step_up_provider is not None and not callable(self.step_up_provider):
+            raise SecurityContextError(
+                "Security context step-up provider is invalid",
+                SecurityContextReason.INVALID,
+            )
+        if not isinstance(self.require_high_risk_step_up, bool):
+            raise SecurityContextError(
+                "Security context step-up requirement is invalid",
+                SecurityContextReason.INVALID,
+            )
         if self.session is not None:
             session_workspace = Path(self.session.meta.workspace_root).resolve()
             if session_workspace != self.workspace.root:
@@ -381,6 +433,7 @@ def _correlation_metadata(
     action_id: str,
     decision: str,
     authorization: ScopeDecision | None = None,
+    authentication: AuthenticationDecision | None = None,
 ) -> dict[str, Any]:
     metadata: dict[str, Any] = {
         "request_id": context.request_id,
@@ -390,6 +443,8 @@ def _correlation_metadata(
     }
     if authorization is not None:
         metadata["scope_authorization"] = authorization.to_metadata()
+    if authentication is not None:
+        metadata["session_authentication"] = authentication.to_metadata()
     if context.session_id is not None:
         metadata["session_id"] = context.session_id
     return metadata
@@ -401,6 +456,7 @@ def _with_correlation(
     action_id: str,
     decision: str,
     authorization: ScopeDecision | None = None,
+    authentication: AuthenticationDecision | None = None,
 ) -> ToolResult:
     return ToolResult(
         success=result.success,
@@ -413,6 +469,7 @@ def _with_correlation(
                 action_id,
                 decision,
                 authorization,
+                authentication,
             ),
         },
     )
@@ -442,6 +499,7 @@ def _audit(
     result: ToolResult | None = None,
     attempt_event_id: str | None = None,
     authorization: ScopeDecision | None = None,
+    authentication: AuthenticationDecision | None = None,
 ) -> AuditRecord | None:
     logger = context.audit_logger
     if logger is None:
@@ -452,9 +510,18 @@ def _audit(
         success=None if result is None else result.success,
         error=None if result is None else result.error,
         metadata=(
-            {"scope_authorization": authorization.to_metadata()}
-            if result is None and authorization is not None
-            else {}
+            {
+                **(
+                    {"scope_authorization": authorization.to_metadata()}
+                    if authorization is not None
+                    else {}
+                ),
+                **(
+                    {"session_authentication": authentication.to_metadata()}
+                    if authentication is not None
+                    else {}
+                ),
+            }
             if result is None
             else result.metadata
         ),
@@ -476,6 +543,7 @@ def _result_evidence(
     result: ToolResult,
     attempt: AuditRecord | None,
     authorization: ScopeDecision,
+    authentication: AuthenticationDecision,
 ) -> AuditRecord | None:
     completed = _audit(
         context,
@@ -487,6 +555,7 @@ def _result_evidence(
         result=result,
         attempt_event_id=None if attempt is None else attempt.event_id,
         authorization=authorization,
+        authentication=authentication,
     )
     if context.session is not None:
         context.session.append_tool_call(
@@ -515,6 +584,7 @@ def _finalize_evidence(
     result: ToolResult,
     attempt: AuditRecord | None,
     authorization: ScopeDecision,
+    authentication: AuthenticationDecision,
 ) -> ToolResult:
     try:
         _result_evidence(
@@ -525,6 +595,7 @@ def _finalize_evidence(
             result=result,
             attempt=attempt,
             authorization=authorization,
+            authentication=authentication,
         )
     except Exception:
         return _with_correlation(
@@ -536,6 +607,7 @@ def _finalize_evidence(
             action_id,
             "deny",
             authorization,
+            authentication,
         )
     return result
 
@@ -583,6 +655,76 @@ def _authorization_refusal(
     )
 
 
+def _authentication_for_action(
+    context: SecurityContext,
+    tool_name: str,
+    tool_args: dict[str, Any],
+    authorization: ScopeDecision,
+) -> AuthenticationDecision:
+    """Require exact-action fresh step-up only for high-risk scoped actions."""
+
+    if (
+        not authorization.allowed
+        or not context.require_high_risk_step_up
+        or PrincipalScope.HIGH_RISK_MANAGE not in authorization.required_scopes
+    ):
+        return not_required_decision()
+    principal = context.principal
+    if principal is None:
+        return denied_authentication(AuthenticationReason.MISSING)
+    binding = AuthenticationBinding.for_action(
+        principal,
+        context.workspace.root,
+        context.session_id,
+        tool_name,
+        tool_args,
+    )
+    manager = context.authentication_manager
+    provider = context.step_up_provider
+    if manager is None or provider is None:
+        return denied_authentication(
+            AuthenticationReason.MISSING,
+            binding=binding,
+        )
+    if manager.revoked:
+        return denied_authentication(
+            AuthenticationReason.REVOKED,
+            binding=binding,
+        )
+    try:
+        token = provider(binding)
+    except Exception:
+        return denied_authentication(
+            AuthenticationReason.PROVIDER_ERROR,
+            binding=binding,
+        )
+    if token is None:
+        return denied_authentication(
+            AuthenticationReason.MISSING,
+            binding=binding,
+        )
+    return manager.consume_step_up(token, binding)
+
+
+def _authentication_refusal(
+    authentication: AuthenticationDecision,
+) -> ToolResult:
+    if authentication.reason is AuthenticationReason.EXPIRED:
+        message = "Fresh step-up authentication has expired"
+    elif authentication.reason is AuthenticationReason.REVOKED:
+        message = "Step-up authentication has been revoked"
+    elif authentication.reason is AuthenticationReason.REPLAY:
+        message = "Step-up authentication proof was already consumed"
+    elif authentication.reason is AuthenticationReason.BINDING_MISMATCH:
+        message = "Step-up authentication does not match this action"
+    else:
+        message = "Fresh step-up authentication is missing or invalid"
+    return _err(
+        message,
+        rejection_reason=authentication.reason.value,
+    )
+
+
 def invoke(tool_name: str, **tool_args: Any) -> ToolResult:
     """Invoke one product tool through the mandatory policy middleware."""
 
@@ -593,6 +735,12 @@ def invoke(tool_name: str, **tool_args: Any) -> ToolResult:
         return _context_refusal(exc)
 
     authorization = _authorization_for_action(context, tool_name, tool_args)
+    authentication = _authentication_for_action(
+        context,
+        tool_name,
+        tool_args,
+        authorization,
+    )
     try:
         attempt = _audit(
             context,
@@ -602,6 +750,7 @@ def invoke(tool_name: str, **tool_args: Any) -> ToolResult:
             action_id=action_id,
             decision=None,
             authorization=authorization,
+            authentication=authentication,
         )
     except Exception:
         return _with_correlation(
@@ -613,6 +762,7 @@ def invoke(tool_name: str, **tool_args: Any) -> ToolResult:
             action_id,
             "deny",
             authorization,
+            authentication,
         )
 
     if not authorization.allowed:
@@ -622,6 +772,7 @@ def invoke(tool_name: str, **tool_args: Any) -> ToolResult:
             action_id,
             "deny",
             authorization,
+            authentication,
         )
         return _finalize_evidence(
             context,
@@ -631,6 +782,27 @@ def invoke(tool_name: str, **tool_args: Any) -> ToolResult:
             result=result,
             attempt=attempt,
             authorization=authorization,
+            authentication=authentication,
+        )
+
+    if not authentication.allowed:
+        result = _with_correlation(
+            _authentication_refusal(authentication),
+            context,
+            action_id,
+            "deny",
+            authorization,
+            authentication,
+        )
+        return _finalize_evidence(
+            context,
+            tool=tool_name,
+            args=tool_args,
+            action_id=action_id,
+            result=result,
+            attempt=attempt,
+            authorization=authorization,
+            authentication=authentication,
         )
 
     handler = _TOOL_HANDLERS.get(tool_name)
@@ -644,6 +816,7 @@ def invoke(tool_name: str, **tool_args: Any) -> ToolResult:
             action_id,
             "deny",
             authorization,
+            authentication,
         )
         return _finalize_evidence(
             context,
@@ -653,6 +826,7 @@ def invoke(tool_name: str, **tool_args: Any) -> ToolResult:
             result=result,
             attempt=attempt,
             authorization=authorization,
+            authentication=authentication,
         )
 
     if len(context.tracker.summaries) >= context.tracker.max_tool_calls:
@@ -668,6 +842,7 @@ def invoke(tool_name: str, **tool_args: Any) -> ToolResult:
             action_id,
             "deny",
             authorization,
+            authentication,
         )
         return _finalize_evidence(
             context,
@@ -677,6 +852,7 @@ def invoke(tool_name: str, **tool_args: Any) -> ToolResult:
             result=result,
             attempt=attempt,
             authorization=authorization,
+            authentication=authentication,
         )
 
     try:
@@ -696,6 +872,7 @@ def invoke(tool_name: str, **tool_args: Any) -> ToolResult:
         action_id,
         decision,
         authorization,
+        authentication,
     )
     summary = context.tracker.record_result(tool_name, tool_args, result)
     if summary is None:
@@ -708,6 +885,7 @@ def invoke(tool_name: str, **tool_args: Any) -> ToolResult:
             action_id,
             "deny",
             authorization,
+            authentication,
         )
 
     return _finalize_evidence(
@@ -718,4 +896,5 @@ def invoke(tool_name: str, **tool_args: Any) -> ToolResult:
         result=result,
         attempt=attempt,
         authorization=authorization,
+        authentication=authentication,
     )

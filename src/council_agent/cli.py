@@ -388,6 +388,15 @@ def run(
     scope_summary = ", ".join(
         sorted(scope.value for scope in principal.scopes)
     )
+    authentication_verifier = settings.council_auth_secret
+    if (
+        authentication_verifier is not None
+        and not authentication_verifier.get_secret_value()
+    ):
+        authentication_verifier = None
+    step_up_status = (
+        "configured" if authentication_verifier is not None else "not configured"
+    )
 
     console.print(
         Panel(
@@ -396,6 +405,7 @@ def run(
             f"[bold]Confirm:[/bold] {confirm_mode.value}\n"
             f"[bold]Principal:[/bold] {principal.audit_ref}\n"
             f"[bold]Scopes:[/bold] {scope_summary}\n"
+            f"[bold]High-risk step-up:[/bold] {step_up_status}\n"
             f"[bold]Task:[/bold] {prompt}",
             title="Council Agent",
             border_style="blue",
@@ -410,6 +420,7 @@ def run(
             principal=principal,
             verbose=verbose,
             confirm_mode=confirm_mode,
+            authentication_verifier=authentication_verifier,
         )
 
     if verbose:
