@@ -1,11 +1,11 @@
 ## 1. Grant model and user-owned storage boundary
 
-- [ ] 1.1 Add strict schema-v1 grant/document/decision models with canonical action, JSON resource, scope, identity, timestamp, expiry, revocation, and unique-ID validation.
-- [ ] 1.2 Implement default user-data root resolution and fail-closed POSIX ownership, permissions, symlink, ancestor, and workspace-separation validation.
-- [ ] 1.3 Implement validated inter-process locking, strict locked reads, canonical serialization, same-directory atomic replace, file/directory flush, and validation-only inspection.
-- [ ] 1.4 Add exact active lookup, expiry, persistent revocation tombstone, duplicate/conflict/corruption/future-schema, restart, and clock-rollback unit tests using only `tmp_path`.
-- [ ] 1.5 Add concurrent-process, failed-write/replace, unsafe owner/mode/symlink, workspace overlap, and no-partial-adoption tests.
-- [ ] 1.6 Run the focused grant-store suite and full `uv run pytest` before authentication integration.
+- [x] 1.1 Add strict schema-v1 grant/document/decision models with canonical action, JSON resource, scope, identity, timestamp, expiry, revocation, and unique-ID validation.
+- [x] 1.2 Implement default user-data root resolution and fail-closed POSIX ownership, permissions, symlink, ancestor, and workspace-separation validation.
+- [x] 1.3 Implement validated inter-process locking, strict locked reads, canonical serialization, same-directory atomic replace, file/directory flush, and validation-only inspection.
+- [x] 1.4 Add exact active lookup, expiry, persistent revocation tombstone, duplicate/conflict/corruption/future-schema, restart, and clock-rollback unit tests using only `tmp_path`.
+- [x] 1.5 Add concurrent-process, failed-write/replace, unsafe owner/mode/symlink, workspace overlap, and no-partial-adoption tests.
+- [x] 1.6 Run the focused grant-store suite and full `uv run pytest` before authentication integration.
 
 ## 2. Authenticated management and masked audit
 
