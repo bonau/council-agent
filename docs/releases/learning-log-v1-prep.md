@@ -550,3 +550,10 @@ alpha 才開始實作 Trust Tier 0/1/2 runtime；本紀錄中的 v0.9.x 工作�
 - 文件影響：README、known issues、v0.9.x handoff、security／sandbox／orchestration deltas與本 learning log 更新；feature branch 不 bump version。
 - Archive：17/17 tasks complete；delta 已同步；change 移至 `openspec/changes/archive/2026-08-11-policy-trust-boundary/`。
 - 下一步：合併 feature PR；之後只在 `release/0.9.3` 做版本 bump／tag。
+
+### 2026-08-11 17:49 UTC — v0.9.3 tagged
+
+- 狀態：通過
+- 基準：tag `v0.9.3`
+- 驗證：334 passed
+- 下一步：v0.9.4 audit-integrity
