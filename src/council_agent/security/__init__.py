@@ -61,6 +61,8 @@ from council_agent.security.policy import (
     set_active_policy,
 )
 from council_agent.security.middleware import (
+    POLICY_VERSION_BUILTIN,
+    POLICY_VERSION_PROJECT_V1,
     POLICY_VERSION_UNVERSIONED,
     SUPPORTED_TOOL_NAMES,
     SecurityContext,
@@ -91,6 +93,8 @@ __all__ = [
     "DEFAULT_ARG_MAX_CHARS",
     "DEFAULT_EVENTS_FILENAME",
     "POLICY_FILENAME",
+    "POLICY_VERSION_BUILTIN",
+    "POLICY_VERSION_PROJECT_V1",
     "POLICY_VERSION_UNVERSIONED",
     "PolicyCommandDecision",
     "PolicyCommandReason",

@@ -15,11 +15,18 @@ from council_agent.sandbox.session import SessionManager
 from council_agent.sandbox.workspace import DEFAULT_DENIED_PATTERNS, WorkspaceGuard
 from council_agent.security.audit import AuditLogger
 from council_agent.security.confirm import ConfirmationPolicy
-from council_agent.security.policy import CouncilPolicy
+from council_agent.security.policy import (
+    CURRENT_POLICY_SCHEMA_VERSION,
+    CouncilPolicy,
+)
 from council_agent.tools.base import ToolResult, _err
 from council_agent.tools.tracker import ToolCallTracker
 
 POLICY_VERSION_UNVERSIONED = "v0.9-unversioned"
+POLICY_VERSION_BUILTIN = "builtin"
+POLICY_VERSION_PROJECT_V1 = (
+    f"project-policy/v{CURRENT_POLICY_SCHEMA_VERSION}"
+)
 SUPPORTED_TOOL_NAMES = frozenset(
     {
         "read_file",
@@ -98,7 +105,7 @@ class SecurityContext:
     session_id: str | None = None
     session: SessionManager | None = None
     audit_logger: AuditLogger | None = None
-    policy_version: str = POLICY_VERSION_UNVERSIONED
+    policy_version: str = POLICY_VERSION_BUILTIN
     _lease: _ContextLease = field(
         default_factory=_ContextLease,
         repr=False,
@@ -117,7 +124,6 @@ class SecurityContext:
         tracker: ToolCallTracker | None = None,
         session: SessionManager | None = None,
         audit_logger: AuditLogger | None = None,
-        policy_version: str = POLICY_VERSION_UNVERSIONED,
     ) -> SecurityContext:
         """Build and validate one context snapshot for a product scope."""
 
@@ -136,7 +142,7 @@ class SecurityContext:
             session_id=resolved_session_id,
             session=session,
             audit_logger=audit_logger,
-            policy_version=policy_version,
+            policy_version=_policy_version(policy),
         )
         context.validate(require_active=False)
         return context
@@ -152,6 +158,12 @@ class SecurityContext:
         if not self.policy_version.strip():
             raise SecurityContextError(
                 "Security context policy_version must be non-empty",
+                SecurityContextReason.INVALID,
+            )
+        expected_policy_version = _policy_version(self.policy)
+        if self.policy_version != expected_policy_version:
+            raise SecurityContextError(
+                "Security context policy_version does not match policy snapshot",
                 SecurityContextReason.INVALID,
             )
         if not isinstance(self.tracker, ToolCallTracker):
@@ -208,6 +220,12 @@ def _workspace_guard(
     return WorkspaceGuard(Path(workspace_root), denied_patterns=tuple(patterns))
 
 
+def _policy_version(policy: CouncilPolicy | None) -> str:
+    if policy is None:
+        return POLICY_VERSION_BUILTIN
+    return f"project-policy/v{policy.schema_version}"
+
+
 def get_security_context() -> SecurityContext | None:
     """Return the current context without synthesizing a default."""
 
@@ -245,6 +263,7 @@ def _set_security_context_view(
         assert policy is None or isinstance(policy, CouncilPolicy)
         updates["policy"] = policy
         updates["workspace"] = _workspace_guard(current.workspace.root, policy)
+        updates["policy_version"] = _policy_version(policy)
     if confirmation is not _UNSET:
         assert isinstance(confirmation, ConfirmationPolicy)
         updates["confirmation"] = confirmation
