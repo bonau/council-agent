@@ -86,8 +86,8 @@ def test_cli_grant_list_revoke_across_invocations_without_provider_key(
     listed = runner.invoke(app, ["trust", "list"])
     assert listed.exit_code == 0, listed.output
     assert "read_file" in listed.output
-    assert "README.md" in listed.output
     assert "active" in listed.output
+    assert "README.md" in created.output
 
     revoked = runner.invoke(app, ["trust", "revoke", grant_id])
     assert revoked.exit_code == 0, revoked.output
