@@ -205,7 +205,7 @@ def test_policy_denied_path_blocked(guard: WorkspaceGuard, tmp_path: Path) -> No
     secrets = tmp_path / "secrets"
     secrets.mkdir()
     (secrets / "token.txt").write_text("x", encoding="utf-8")
-    policy = CouncilPolicy(denied_paths=["secrets/**"])
+    policy = CouncilPolicy(schema_version=1, denied_paths=["secrets/**"])
     with active_policy(policy):
         with pytest.raises(WorkspaceGuardError, match="denied"):
             guard.resolve("secrets/token.txt")
@@ -215,7 +215,7 @@ def test_default_denylist_still_applies_with_policy(
     guard: WorkspaceGuard, tmp_path: Path
 ) -> None:
     (tmp_path / ".env").write_text("SECRET=1", encoding="utf-8")
-    policy = CouncilPolicy(denied_paths=["secrets/**"])
+    policy = CouncilPolicy(schema_version=1, denied_paths=["secrets/**"])
     with active_policy(policy):
         with pytest.raises(WorkspaceGuardError, match="denied"):
             guard.resolve(".env")

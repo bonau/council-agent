@@ -33,7 +33,9 @@ def test_read_file_rejects_policy_denied_path(tmp_path: Path) -> None:
     secrets = tmp_path / "secrets"
     secrets.mkdir()
     (secrets / "token.txt").write_text("secret", encoding="utf-8")
-    with active_policy(CouncilPolicy(denied_paths=["secrets/**"])):
+    with active_policy(
+        CouncilPolicy(schema_version=1, denied_paths=["secrets/**"])
+    ):
         result = read_file("secrets/token.txt")
     assert not result.success
     assert result.error is not None

@@ -15,7 +15,7 @@ from council_agent.tools.shell import run_command
 
 
 def test_policy_denied_command_does_not_run() -> None:
-    policy = CouncilPolicy(denied_commands=["curl *"])
+    policy = CouncilPolicy(schema_version=1, denied_commands=["curl *"])
     with mock.patch("council_agent.tools.shell.subprocess.run") as run_mock:
         with active_policy(policy):
             result = run_command("curl https://example.com")
@@ -30,7 +30,7 @@ def test_policy_denied_command_does_not_run() -> None:
 
 
 def test_policy_allowlist_refuses_other_commands() -> None:
-    policy = CouncilPolicy(allowed_commands=["pytest *"])
+    policy = CouncilPolicy(schema_version=1, allowed_commands=["pytest *"])
     with mock.patch("council_agent.tools.shell.subprocess.run") as run_mock:
         with active_policy(policy):
             result = run_command("echo hello")
@@ -41,7 +41,7 @@ def test_policy_allowlist_refuses_other_commands() -> None:
 
 
 def test_policy_allowlist_permits_matching_read_command() -> None:
-    policy = CouncilPolicy(allowed_commands=["echo *"])
+    policy = CouncilPolicy(schema_version=1, allowed_commands=["echo *"])
     with active_policy(policy):
         result = run_command("echo hello")
 
@@ -52,7 +52,7 @@ def test_policy_allowlist_permits_matching_read_command() -> None:
 
 def test_policy_check_precedes_confirmation_prompt() -> None:
     """Denied-by-policy dangerous command must not invoke confirmation."""
-    policy = CouncilPolicy(denied_commands=["curl *"])
+    policy = CouncilPolicy(schema_version=1, denied_commands=["curl *"])
     confirm_calls: list[str] = []
 
     def _confirm(message: str) -> bool:
@@ -71,7 +71,7 @@ def test_policy_check_precedes_confirmation_prompt() -> None:
 
 
 def test_policy_allowed_dangerous_still_needs_confirmation() -> None:
-    policy = CouncilPolicy(allowed_commands=["curl *"])
+    policy = CouncilPolicy(schema_version=1, allowed_commands=["curl *"])
     with mock.patch("council_agent.tools.shell.subprocess.run") as run_mock:
         with active_policy(policy):
             with confirmation_policy(ConfirmMode.REFUSE):
@@ -80,6 +80,18 @@ def test_policy_allowed_dangerous_still_needs_confirmation() -> None:
     assert result.success is False
     assert result.metadata.get("classification") == "dangerous"
     assert result.metadata.get("confirmation") == "refused"
+    assert "policy_decision" not in result.metadata
+    run_mock.assert_not_called()
+
+
+def test_policy_allowlist_cannot_admit_unsupported_command() -> None:
+    policy = CouncilPolicy(schema_version=1, allowed_commands=["*"])
+    with mock.patch("council_agent.tools.shell.subprocess.run") as run_mock:
+        with active_policy(policy):
+            result = run_command("unknown-product-command")
+
+    assert result.success is False
+    assert result.metadata["rejection_reason"] == "unsupported"
     assert "policy_decision" not in result.metadata
     run_mock.assert_not_called()
 

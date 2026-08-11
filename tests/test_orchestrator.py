@@ -300,7 +300,7 @@ def test_run_council_installs_and_resets_project_policy(
     apply_workspace_root(tmp_path)
     monkeypatch.chdir(tmp_path)
     (tmp_path / "council.policy.yaml").write_text(
-        "denied_commands:\n  - \"curl *\"\n",
+        "schema_version: 1\ndenied_commands:\n  - \"curl *\"\n",
         encoding="utf-8",
     )
 
@@ -361,7 +361,7 @@ def test_run_council_invalid_policy_fails_before_crews(
     apply_workspace_root(tmp_path)
     monkeypatch.chdir(tmp_path)
     (tmp_path / "council.policy.yaml").write_text(
-        "denied_commands: not-a-list\n",
+        "schema_version: 1\ndenied_commands: not-a-list\n",
         encoding="utf-8",
     )
 

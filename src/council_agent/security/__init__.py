@@ -43,6 +43,7 @@ from council_agent.security.confirm import (
     set_confirmation_policy,
 )
 from council_agent.security.policy import (
+    CURRENT_POLICY_SCHEMA_VERSION,
     POLICY_FILENAME,
     CouncilPolicy,
     PolicyCommandDecision,
@@ -86,6 +87,7 @@ __all__ = [
     "ConfirmationPolicy",
     "ConfirmationResult",
     "CouncilPolicy",
+    "CURRENT_POLICY_SCHEMA_VERSION",
     "DEFAULT_ARG_MAX_CHARS",
     "DEFAULT_EVENTS_FILENAME",
     "POLICY_FILENAME",
