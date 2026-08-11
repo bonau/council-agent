@@ -17,9 +17,16 @@ from council_agent.security.middleware import (
     get_security_context,
     invoke,
     security_context,
+    without_security_context,
 )
 from council_agent.tools.base import ToolResult
 from council_agent.tools.tracker import ToolCallTracker
+
+
+@pytest.fixture(autouse=True)
+def no_default_security_context(workspace_root: Path) -> None:
+    with without_security_context():
+        yield
 
 
 def _success_handler(

@@ -8,10 +8,10 @@
 
 ## 2. Public Tool Boundary
 
-- [ ] 2.1 Convert filesystem public functions to dispatcher adapters and private context-requiring guarded operations
-- [ ] 2.2 Convert shell and pytest public functions to dispatcher adapters while retaining v0.9.1 canonical action, policy, confirmation, containment, and shell-free execution
-- [ ] 2.3 Ensure top-level tool results/summaries carry one request/action/decision correlation and composite `run_tests` consumes one call
-- [ ] 2.4 Add bypass-closure, direct-vs-dispatch, no-side-effect, same-action decision, and composite-tool tests
+- [x] 2.1 Convert filesystem public functions to dispatcher adapters and private context-requiring guarded operations
+- [x] 2.2 Convert shell and pytest public functions to dispatcher adapters while retaining v0.9.1 canonical action, policy, confirmation, containment, and shell-free execution
+- [x] 2.3 Ensure top-level tool results/summaries carry one request/action/decision correlation and composite `run_tests` consumes one call
+- [x] 2.4 Add bypass-closure, direct-vs-dispatch, no-side-effect, same-action decision, and composite-tool tests
 - [ ] 2.5 Commit and push the public-boundary phase, then run `uv run pytest` with the full existing suite green
 
 ## 3. Orchestrator Wiring

@@ -8,6 +8,8 @@ import pytest
 
 from council_agent.config.settings import get_settings
 from council_agent.sandbox.workspace import get_workspace_guard
+from council_agent.security.middleware import SecurityContext, security_context
+from council_agent.tools.tracker import ToolCallTracker
 
 
 @pytest.fixture(autouse=True)
@@ -19,6 +21,12 @@ def workspace_root(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     monkeypatch.setenv("OPENROUTER_API_KEY", "test-key")
     get_settings.cache_clear()
     get_workspace_guard.cache_clear()
-    yield tmp_path
+    context = SecurityContext.create(
+        tmp_path,
+        request_id=f"pytest-{tmp_path.name}",
+        tracker=ToolCallTracker(max_tool_calls=1000),
+    )
+    with security_context(context):
+        yield tmp_path
     get_settings.cache_clear()
     get_workspace_guard.cache_clear()

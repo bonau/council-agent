@@ -35,6 +35,7 @@ from council_agent.security.confirm import (
     ConfirmMode,
     confirmation_policy,
     default_confirm_fn,
+    evaluate_confirmation,
     get_confirmation_policy,
     require_confirmation,
     reset_confirmation_policy,
@@ -68,6 +69,7 @@ from council_agent.security.middleware import (
     invoke,
     require_security_context,
     security_context,
+    without_security_context,
 )
 
 __all__ = [
@@ -105,6 +107,7 @@ __all__ = [
     "confirmation_policy",
     "default_audit_events_path",
     "default_confirm_fn",
+    "evaluate_confirmation",
     "effective_denied_paths",
     "evaluate_command",
     "evaluate_command_policy",
@@ -130,4 +133,5 @@ __all__ = [
     "set_confirmation_policy",
     "security_context",
     "truncate_value",
+    "without_security_context",
 ]

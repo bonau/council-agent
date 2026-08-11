@@ -5,17 +5,17 @@ from __future__ import annotations
 import uuid
 from collections.abc import Callable
 from contextlib import contextmanager
-from contextvars import ContextVar
-from dataclasses import dataclass, field
+from contextvars import ContextVar, Token
+from dataclasses import dataclass, field, replace
 from enum import Enum
 from pathlib import Path
 from typing import Any, Iterator
 
 from council_agent.sandbox.session import SessionManager
-from council_agent.sandbox.workspace import WorkspaceGuard
+from council_agent.sandbox.workspace import DEFAULT_DENIED_PATTERNS, WorkspaceGuard
 from council_agent.security.audit import AuditLogger
 from council_agent.security.confirm import ConfirmationPolicy
-from council_agent.security.policy import CouncilPolicy, effective_denied_paths
+from council_agent.security.policy import CouncilPolicy
 from council_agent.tools.base import ToolResult, _err
 from council_agent.tools.tracker import ToolCallTracker
 
@@ -129,10 +129,7 @@ class SecurityContext:
 
         context = cls(
             request_id=request_id or str(uuid.uuid4()),
-            workspace=WorkspaceGuard(
-                Path(workspace_root),
-                denied_patterns=effective_denied_paths(policy),
-            ),
+            workspace=_workspace_guard(Path(workspace_root), policy),
             policy=policy,
             confirmation=confirmation or ConfirmationPolicy(),
             tracker=tracker if tracker is not None else ToolCallTracker(),
@@ -196,6 +193,19 @@ _ACTIVE_CONTEXT: ContextVar[SecurityContext | None] = ContextVar(
     "council_security_context",
     default=None,
 )
+_UNSET = object()
+
+
+def _workspace_guard(
+    workspace_root: Path | str,
+    policy: CouncilPolicy | None,
+) -> WorkspaceGuard:
+    patterns = list(DEFAULT_DENIED_PATTERNS)
+    if policy is not None:
+        for pattern in policy.denied_paths:
+            if pattern not in patterns:
+                patterns.append(pattern)
+    return WorkspaceGuard(Path(workspace_root), denied_patterns=tuple(patterns))
 
 
 def get_security_context() -> SecurityContext | None:
@@ -215,6 +225,54 @@ def require_security_context() -> SecurityContext:
         )
     context.validate(require_active=True)
     return context
+
+
+def _set_security_context_view(
+    *,
+    policy: CouncilPolicy | None | object = _UNSET,
+    confirmation: ConfirmationPolicy | object = _UNSET,
+    audit_logger: AuditLogger | None | object = _UNSET,
+) -> Token[SecurityContext | None] | None:
+    """Derive one complete active view for legacy low-level context helpers."""
+
+    current = get_security_context()
+    if current is None:
+        return None
+    current.validate(require_active=True)
+
+    updates: dict[str, Any] = {}
+    if policy is not _UNSET:
+        assert policy is None or isinstance(policy, CouncilPolicy)
+        updates["policy"] = policy
+        updates["workspace"] = _workspace_guard(current.workspace.root, policy)
+    if confirmation is not _UNSET:
+        assert isinstance(confirmation, ConfirmationPolicy)
+        updates["confirmation"] = confirmation
+    if audit_logger is not _UNSET:
+        assert audit_logger is None or isinstance(audit_logger, AuditLogger)
+        updates["audit_logger"] = audit_logger
+
+    derived = replace(current, **updates)
+    derived.validate(require_active=True)
+    return _ACTIVE_CONTEXT.set(derived)
+
+
+def _reset_security_context_view(
+    token: Token[SecurityContext | None] | None,
+) -> None:
+    if token is not None:
+        _ACTIVE_CONTEXT.reset(token)
+
+
+@contextmanager
+def without_security_context() -> Iterator[None]:
+    """Temporarily expose fail-closed missing-context behavior."""
+
+    token = _ACTIVE_CONTEXT.set(None)
+    try:
+        yield
+    finally:
+        _ACTIVE_CONTEXT.reset(token)
 
 
 @contextmanager

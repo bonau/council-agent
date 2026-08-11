@@ -15,17 +15,20 @@ from typing import Any
 from council_agent.sandbox.workspace import (
     DeniedPathError,
     WorkspaceGuardError,
-    get_workspace_guard,
 )
-from council_agent.security import (
-    ActionKind,
+from council_agent.security.classifier import (
     ClassificationResult,
     CommandCategory,
     RejectedCommandAnalysis,
     classify_command,
-    evaluate_command_policy,
-    require_confirmation,
 )
+from council_agent.security.confirm import ActionKind, evaluate_confirmation
+from council_agent.security.middleware import (
+    SecurityContext,
+    _register_tool,
+    invoke,
+)
+from council_agent.security.policy import evaluate_command
 from council_agent.tools.base import ToolResult, _err, _ok
 from council_agent.tools.pytest_args import RejectedPytestArgs, parse_pytest_args
 
@@ -125,11 +128,15 @@ def _prepare_command_action(
     )
 
 
-def _authorize_action(action: _PreparedAction) -> dict[str, Any] | ToolResult:
+def _authorize_action(
+    context: SecurityContext,
+    action: _PreparedAction,
+) -> dict[str, Any] | ToolResult:
     """Apply project policy and confirmation to one canonical action."""
 
+    context.validate(require_active=True)
     class_meta = _classification_metadata(action)
-    policy_decision = evaluate_command_policy(action.canonical_command)
+    policy_decision = evaluate_command(action.canonical_command, context.policy)
     if not policy_decision.allowed:
         reason = (
             policy_decision.reason.value
@@ -153,7 +160,11 @@ def _authorize_action(action: _PreparedAction) -> dict[str, Any] | ToolResult:
     if gate_kind is None:
         return class_meta
 
-    decision = require_confirmation(gate_kind, action.canonical_command)
+    decision = evaluate_confirmation(
+        context.confirmation,
+        gate_kind,
+        action.canonical_command,
+    )
     if decision.outcome.value != "compat_allow":
         class_meta["confirmation"] = decision.outcome.value
     if decision.allowed:
@@ -166,6 +177,7 @@ def _authorize_action(action: _PreparedAction) -> dict[str, Any] | ToolResult:
 
 
 def _execute_prepared(
+    context: SecurityContext,
     action: _PreparedAction,
     *,
     workdir: Path,
@@ -174,6 +186,7 @@ def _execute_prepared(
 ) -> ToolResult:
     """Execute retained argv directly, with no serialization or shell."""
 
+    context.validate(require_active=True)
     class_meta = authorization_meta or _classification_metadata(action)
     start = time.monotonic()
     try:
@@ -216,13 +229,16 @@ def _execute_prepared(
     )
 
 
-def run_command(
+def _run_command(
+    context: SecurityContext,
+    *,
     command: str,
     cwd: str | None = None,
     *,
     timeout_sec: int = 120,
 ) -> ToolResult:
-    guard = get_workspace_guard()
+    context.validate(require_active=True)
+    guard = context.workspace
     try:
         workdir = guard.resolve_cwd(cwd)
     except WorkspaceGuardError as exc:
@@ -246,10 +262,11 @@ def run_command(
     prepared = _prepare_command_action(analysis)
     if isinstance(prepared, ToolResult):
         return prepared
-    authorization = _authorize_action(prepared)
+    authorization = _authorize_action(context, prepared)
     if isinstance(authorization, ToolResult):
         return authorization
     return _execute_prepared(
+        context,
         prepared,
         workdir=workdir,
         timeout_sec=timeout_sec,
@@ -257,13 +274,16 @@ def run_command(
     )
 
 
-def run_tests(
+def _run_tests(
+    context: SecurityContext,
+    *,
     path: str = ".",
     args: str = "",
     *,
     timeout_sec: int = 120,
 ) -> ToolResult:
-    guard = get_workspace_guard()
+    context.validate(require_active=True)
+    guard = context.workspace
     try:
         test_path = guard.resolve(path)
     except WorkspaceGuardError as exc:
@@ -302,10 +322,11 @@ def run_tests(
         category=CommandCategory.WRITE,
         matched_rule="run-tests",
     )
-    authorization = _authorize_action(action)
+    authorization = _authorize_action(context, action)
     if isinstance(authorization, ToolResult):
         return authorization
     result = _execute_prepared(
+        context,
         action,
         workdir=guard.root,
         timeout_sec=timeout_sec,
@@ -327,3 +348,39 @@ def run_tests(
 
     error = result.error or f"Tests failed with exit code {exit_code}"
     return _err(error, output=result.output, **metadata)
+
+
+def run_command(
+    command: str,
+    cwd: str | None = None,
+    *,
+    timeout_sec: int = 120,
+) -> ToolResult:
+    """Run one supported command through the mandatory policy dispatcher."""
+
+    return invoke(
+        "run_command",
+        command=command,
+        cwd=cwd,
+        timeout_sec=timeout_sec,
+    )
+
+
+def run_tests(
+    path: str = ".",
+    args: str = "",
+    *,
+    timeout_sec: int = 120,
+) -> ToolResult:
+    """Run pytest through the mandatory policy dispatcher."""
+
+    return invoke(
+        "run_tests",
+        path=path,
+        args=args,
+        timeout_sec=timeout_sec,
+    )
+
+
+_register_tool("run_command", _run_command)
+_register_tool("run_tests", _run_tests)

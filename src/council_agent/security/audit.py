@@ -156,7 +156,21 @@ def default_audit_events_path(project_root: Path | str) -> Path:
 
 
 def get_audit_logger() -> AuditLogger | None:
-    return _LOGGER.get()
+    legacy = _LOGGER.get()
+    if legacy is not None:
+        return legacy
+
+    from council_agent.security.middleware import get_security_context
+
+    context = get_security_context()
+    if context is not None:
+        try:
+            context.validate(require_active=True)
+        except RuntimeError:
+            pass
+        else:
+            return context.audit_logger
+    return None
 
 
 def set_audit_logger(logger: AuditLogger | None) -> Token[AuditLogger | None]:
