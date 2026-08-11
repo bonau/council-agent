@@ -46,10 +46,14 @@ class AuditRecord:
     timestamp: str
     tool: str
     args: dict[str, Any]
-    success: bool
+    success: bool | None
     session_id: str | None = None
     error: str | None = None
     metadata: dict[str, Any] = field(default_factory=dict)
+    phase: str = "result"
+    request_id: str | None = None
+    action_id: str | None = None
+    decision: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -71,10 +75,14 @@ def load_audit_events(path: Path | str) -> list[AuditRecord]:
                 timestamp=data["timestamp"],
                 tool=data["tool"],
                 args=data.get("args") or {},
-                success=bool(data.get("success")),
+                success=data.get("success"),
                 session_id=data.get("session_id"),
                 error=data.get("error"),
                 metadata=data.get("metadata") or {},
+                phase=data.get("phase") or "result",
+                request_id=data.get("request_id"),
+                action_id=data.get("action_id"),
+                decision=data.get("decision"),
             )
         )
     return events
@@ -102,11 +110,15 @@ class AuditLogger:
         tool: str,
         args: dict[str, Any],
         *,
-        success: bool,
+        success: bool | None,
         error: str | None = None,
         metadata: dict[str, Any] | None = None,
         session_id: str | None = None,
         timestamp: str | None = None,
+        phase: str = "result",
+        request_id: str | None = None,
+        action_id: str | None = None,
+        decision: str | None = None,
     ) -> AuditRecord:
         """Append one event and return the stored record."""
         record = AuditRecord(
@@ -117,6 +129,10 @@ class AuditLogger:
             session_id=session_id if session_id is not None else self.session_id,
             error=error,
             metadata=truncate_value(metadata or {}, max_chars=self.arg_max_chars),
+            phase=phase,
+            request_id=request_id,
+            action_id=action_id,
+            decision=decision,
         )
         with self.audit_path.open("a", encoding="utf-8") as handle:
             handle.write(json.dumps(record.to_dict(), ensure_ascii=False) + "\n")
@@ -140,7 +156,21 @@ def default_audit_events_path(project_root: Path | str) -> Path:
 
 
 def get_audit_logger() -> AuditLogger | None:
-    return _LOGGER.get()
+    legacy = _LOGGER.get()
+    if legacy is not None:
+        return legacy
+
+    from council_agent.security.middleware import get_security_context
+
+    context = get_security_context()
+    if context is not None:
+        try:
+            context.validate(require_active=True)
+        except RuntimeError:
+            pass
+        else:
+            return context.audit_logger
+    return None
 
 
 def set_audit_logger(logger: AuditLogger | None) -> Token[AuditLogger | None]:
@@ -165,10 +195,14 @@ def record_audit_event(
     tool: str,
     args: dict[str, Any],
     *,
-    success: bool,
+    success: bool | None,
     error: str | None = None,
     metadata: dict[str, Any] | None = None,
     session_id: str | None = None,
+    phase: str = "result",
+    request_id: str | None = None,
+    action_id: str | None = None,
+    decision: str | None = None,
 ) -> AuditRecord | None:
     """Record via the active ContextVar logger, or no-op when unset."""
     logger = get_audit_logger()
@@ -181,6 +215,10 @@ def record_audit_event(
         error=error,
         metadata=metadata,
         session_id=session_id,
+        phase=phase,
+        request_id=request_id,
+        action_id=action_id,
+        decision=decision,
     )
 
 

@@ -4,16 +4,22 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from council_agent.sandbox.workspace import WorkspaceGuardError, get_workspace_guard
-from council_agent.security import ActionKind, require_confirmation
+from council_agent.sandbox.workspace import WorkspaceGuardError
+from council_agent.security.confirm import ActionKind, evaluate_confirmation
+from council_agent.security.middleware import (
+    SecurityContext,
+    _register_tool,
+    invoke,
+)
 from council_agent.tools.base import ToolResult, _err, _ok
 
 _ENCODING = "utf-8"
 
 
-def read_file(path: str) -> ToolResult:
+def _read_file(context: SecurityContext, *, path: str) -> ToolResult:
+    context.validate(require_active=True)
     try:
-        target = get_workspace_guard().resolve(path)
+        target = context.workspace.resolve(path)
     except WorkspaceGuardError as exc:
         return _err(str(exc))
     try:
@@ -30,13 +36,23 @@ def read_file(path: str) -> ToolResult:
         return _err(str(exc))
 
 
-def write_file(path: str, content: str) -> ToolResult:
+def _write_file(
+    context: SecurityContext,
+    *,
+    path: str,
+    content: str,
+) -> ToolResult:
+    context.validate(require_active=True)
     try:
-        target = get_workspace_guard().resolve(path)
+        target = context.workspace.resolve(path)
     except WorkspaceGuardError as exc:
         return _err(str(exc))
 
-    decision = require_confirmation(ActionKind.WRITE_FILE, path)
+    decision = evaluate_confirmation(
+        context.confirmation,
+        ActionKind.WRITE_FILE,
+        path,
+    )
     confirm_meta: dict[str, str] = {}
     if decision.outcome.value != "compat_allow":
         confirm_meta["confirmation"] = decision.outcome.value
@@ -58,9 +74,10 @@ def write_file(path: str, content: str) -> ToolResult:
         return _err(str(exc), **confirm_meta)
 
 
-def list_dir(path: str) -> ToolResult:
+def _list_dir(context: SecurityContext, *, path: str) -> ToolResult:
+    context.validate(require_active=True)
     try:
-        target = get_workspace_guard().resolve(path)
+        target = context.workspace.resolve(path)
     except WorkspaceGuardError as exc:
         return _err(str(exc))
     try:
@@ -77,13 +94,18 @@ def list_dir(path: str) -> ToolResult:
         return _err(str(exc))
 
 
-def delete_file(path: str) -> ToolResult:
+def _delete_file(context: SecurityContext, *, path: str) -> ToolResult:
+    context.validate(require_active=True)
     try:
-        target = get_workspace_guard().resolve(path)
+        target = context.workspace.resolve(path)
     except WorkspaceGuardError as exc:
         return _err(str(exc))
 
-    decision = require_confirmation(ActionKind.DELETE_FILE, path)
+    decision = evaluate_confirmation(
+        context.confirmation,
+        ActionKind.DELETE_FILE,
+        path,
+    )
     confirm_meta: dict[str, str] = {}
     if decision.outcome.value != "compat_allow":
         confirm_meta["confirmation"] = decision.outcome.value
@@ -104,3 +126,33 @@ def delete_file(path: str) -> ToolResult:
         return _err(f"Permission denied: {path}", **confirm_meta)
     except OSError as exc:
         return _err(str(exc), **confirm_meta)
+
+
+def read_file(path: str) -> ToolResult:
+    """Read a UTF-8 file through the mandatory policy dispatcher."""
+
+    return invoke("read_file", path=path)
+
+
+def write_file(path: str, content: str) -> ToolResult:
+    """Write a UTF-8 file through the mandatory policy dispatcher."""
+
+    return invoke("write_file", path=path, content=content)
+
+
+def list_dir(path: str) -> ToolResult:
+    """List a directory through the mandatory policy dispatcher."""
+
+    return invoke("list_dir", path=path)
+
+
+def delete_file(path: str) -> ToolResult:
+    """Delete a file through the mandatory policy dispatcher."""
+
+    return invoke("delete_file", path=path)
+
+
+_register_tool("read_file", _read_file)
+_register_tool("write_file", _write_file)
+_register_tool("list_dir", _list_dir)
+_register_tool("delete_file", _delete_file)

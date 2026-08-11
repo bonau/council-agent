@@ -8,7 +8,6 @@ from council_agent.config.presets import Preset
 from council_agent.crews.base import crew_output_text
 from council_agent.crews.execution_tools import build_execution_tools
 from council_agent.llm.openrouter import make_llm
-from council_agent.sandbox.session import SessionManager
 from council_agent.tools import ToolCallTracker
 from council_agent.types import ExecutionResult, PlanArtifact
 
@@ -46,12 +45,9 @@ def build_execution_crew(
     preset: Preset,
     api_key: str,
     *,
-    tracker: ToolCallTracker | None = None,
-    session: SessionManager | None = None,
+    enable_tools: bool = True,
 ) -> Crew:
-    tools = []
-    if tracker is not None:
-        tools = build_execution_tools(tracker, session=session)
+    tools = build_execution_tools() if enable_tools else []
 
     role = preset.execution
     agent = Agent(

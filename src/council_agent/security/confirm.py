@@ -49,6 +49,12 @@ class ConfirmationResult:
     outcome: ConfirmationOutcome
 
 
+@dataclass(frozen=True)
+class _ConfirmationPolicyToken:
+    legacy: Token[ConfirmationPolicy]
+    context: object | None
+
+
 _POLICY: ContextVar[ConfirmationPolicy] = ContextVar(
     "council_confirmation_policy",
     default=ConfirmationPolicy(),
@@ -56,15 +62,36 @@ _POLICY: ContextVar[ConfirmationPolicy] = ContextVar(
 
 
 def get_confirmation_policy() -> ConfirmationPolicy:
+    from council_agent.security.middleware import get_security_context
+
+    context = get_security_context()
+    if context is not None:
+        try:
+            context.validate(require_active=True)
+        except RuntimeError:
+            pass
+        else:
+            return context.confirmation
     return _POLICY.get()
 
 
-def set_confirmation_policy(policy: ConfirmationPolicy) -> Token[ConfirmationPolicy]:
-    return _POLICY.set(policy)
+def set_confirmation_policy(policy: ConfirmationPolicy) -> _ConfirmationPolicyToken:
+    from council_agent.security.middleware import _set_security_context_view
+
+    legacy_token = _POLICY.set(policy)
+    try:
+        context_token = _set_security_context_view(confirmation=policy)
+    except Exception:
+        _POLICY.reset(legacy_token)
+        raise
+    return _ConfirmationPolicyToken(legacy=legacy_token, context=context_token)
 
 
-def reset_confirmation_policy(token: Token[ConfirmationPolicy]) -> None:
-    _POLICY.reset(token)
+def reset_confirmation_policy(token: _ConfirmationPolicyToken) -> None:
+    from council_agent.security.middleware import _reset_security_context_view
+
+    _reset_security_context_view(token.context)
+    _POLICY.reset(token.legacy)
 
 
 @contextmanager
@@ -108,7 +135,16 @@ def _needs_confirmation(kind: ActionKind, mode: ConfirmMode) -> bool:
 
 def require_confirmation(kind: ActionKind, detail: str) -> ConfirmationResult:
     """Decide whether a gated action may proceed under the active policy."""
-    policy = get_confirmation_policy()
+    return evaluate_confirmation(get_confirmation_policy(), kind, detail)
+
+
+def evaluate_confirmation(
+    policy: ConfirmationPolicy,
+    kind: ActionKind,
+    detail: str,
+) -> ConfirmationResult:
+    """Evaluate one action against an explicit confirmation-policy snapshot."""
+
     mode = policy.mode
 
     if not _needs_confirmation(kind, mode):
