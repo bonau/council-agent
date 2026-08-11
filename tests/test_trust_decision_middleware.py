@@ -18,6 +18,7 @@ from council_agent.security import (
     SecurityContext,
     full_scope_principal,
     load_audit_events,
+    pipeline_attempt,
     security_context,
     without_security_context,
 )
@@ -215,18 +216,44 @@ def test_result_tracker_session_and_audit_share_matrix_evidence(
     )
 
     with without_security_context(), security_context(context):
-        result = write_file("written.txt", "content")
+        with pipeline_attempt("pipeline-attempt-1"):
+            result = write_file("written.txt", "content")
+        with pipeline_attempt("pipeline-attempt-2"):
+            later_result = write_file("later.txt", "later")
 
     matrix = result.metadata["trust_decision"]
     tracker_matrix = context.tracker.summaries[0].metadata["trust_decision"]
-    session_matrix = json.loads(
-        session.tools_path.read_text(encoding="utf-8")
-    )["metadata"]["trust_decision"]
+    session_lines = [
+        json.loads(line)
+        for line in session.tools_path.read_text(encoding="utf-8").splitlines()
+    ]
+    session_matrix = session_lines[0]["metadata"]["trust_decision"]
+    events = load_audit_events(audit_path)
     result_event = [
-        event for event in load_audit_events(audit_path) if event.phase == "result"
+        event for event in events if event.phase == "result"
     ][0]
 
     assert matrix["outcome"] == "allow"
     assert matrix["reason"] == "decision_allowed"
     assert tracker_matrix == session_matrix == result_event.metadata["trust_decision"]
     assert tracker_matrix == matrix
+    assert result.metadata["pipeline_attempt_id"] == "pipeline-attempt-1"
+    assert later_result.metadata["pipeline_attempt_id"] == "pipeline-attempt-2"
+    assert [
+        summary.metadata["pipeline_attempt_id"]
+        for summary in context.tracker.summaries
+    ] == ["pipeline-attempt-1", "pipeline-attempt-2"]
+    assert [line["pipeline_attempt_id"] for line in session_lines] == [
+        "pipeline-attempt-1",
+        "pipeline-attempt-2",
+    ]
+    assert [
+        event.metadata["pipeline_attempt_id"] for event in events
+    ] == [
+        "pipeline-attempt-1",
+        "pipeline-attempt-1",
+        "pipeline-attempt-2",
+        "pipeline-attempt-2",
+    ]
+    assert session_lines[0]["audit_attempt_event_id"]
+    assert session_lines[0]["audit_result_event_id"]

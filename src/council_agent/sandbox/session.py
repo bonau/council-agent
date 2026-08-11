@@ -93,6 +93,7 @@ class SessionManager:
         error: str | None = None,
         request_id: str | None = None,
         action_id: str | None = None,
+        pipeline_attempt_id: str | None = None,
         audit_attempt_event_id: str | None = None,
         audit_result_event_id: str | None = None,
     ) -> None:
@@ -108,6 +109,7 @@ class SessionManager:
                 "timestamp": _utc_now_iso(),
                 "request_id": request_id,
                 "action_id": action_id,
+                "pipeline_attempt_id": pipeline_attempt_id,
                 "audit_attempt_event_id": audit_attempt_event_id,
                 "audit_result_event_id": audit_result_event_id,
             }

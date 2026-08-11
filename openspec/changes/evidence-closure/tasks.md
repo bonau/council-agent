@@ -3,13 +3,13 @@
 - [x] 1.1 Add ordered pipeline-attempt, attempt-kind, final stop-reason, and final-result consistency types while preserving existing result accessors.
 - [x] 1.2 Implement pure current-attempt evidence validation for correlation, explicitly required product tools, and required pytest exit/count evidence.
 - [x] 1.3 Add focused unit tests for valid evidence, missing/malformed/failed tests, cross-attempt summaries, and text-only compatibility.
-- [ ] 1.4 Run `uv run pytest` and record the all-green phase result before starting boundary wiring.
+- [x] 1.4 Run `uv run pytest` and record the all-green phase result before starting boundary wiring.
 
 ## 2. Dispatcher and persistence attempt correlation
 
-- [ ] 2.1 Add a context-scoped non-authorizing `pipeline_attempt_id` binding and include it in dispatcher result/tracker metadata.
-- [ ] 2.2 Include the same attempt ID in durable audit attempt/result metadata and sandbox session tool records without changing matrix precedence.
-- [ ] 2.3 Add direct/Crew/sandbox tests proving result, tracker, session, and audit correlation agree and prior evidence remains append-only.
+- [x] 2.1 Add a context-scoped non-authorizing `pipeline_attempt_id` binding and include it in dispatcher result/tracker metadata.
+- [x] 2.2 Include the same attempt ID in durable audit attempt/result metadata and sandbox session tool records without changing matrix precedence.
+- [x] 2.3 Add direct/Crew/sandbox tests proving result, tracker, session, and audit correlation agree and prior evidence remains append-only.
 - [ ] 2.4 Run `uv run pytest` and record the all-green phase result before framework integration.
 
 ## 3. Escalation and re-verification integration

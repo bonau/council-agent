@@ -324,6 +324,10 @@ _ACTIVE_CONTEXT: ContextVar[SecurityContext | None] = ContextVar(
     "council_security_context",
     default=None,
 )
+_PIPELINE_ATTEMPT_ID: ContextVar[str | None] = ContextVar(
+    "council_pipeline_attempt_id",
+    default=None,
+)
 _UNSET = object()
 
 
@@ -349,6 +353,29 @@ def get_security_context() -> SecurityContext | None:
     """Return the current context without synthesizing a default."""
 
     return _ACTIVE_CONTEXT.get()
+
+
+def get_pipeline_attempt_id() -> str | None:
+    """Return orchestration correlation without treating it as authority."""
+
+    return _PIPELINE_ATTEMPT_ID.get()
+
+
+@contextmanager
+def pipeline_attempt(attempt_id: str) -> Iterator[str]:
+    """Bind one execution/escalation attempt inside an active run context."""
+
+    normalized = attempt_id.strip()
+    if not normalized:
+        raise ValueError("pipeline attempt ID must be non-empty")
+    require_security_context()
+    if get_pipeline_attempt_id() is not None:
+        raise RuntimeError("a pipeline attempt is already active")
+    token = _PIPELINE_ATTEMPT_ID.set(normalized)
+    try:
+        yield normalized
+    finally:
+        _PIPELINE_ATTEMPT_ID.reset(token)
 
 
 def require_security_context() -> SecurityContext:
@@ -622,6 +649,9 @@ def _correlation_metadata(
         "decision": decision,
         "policy_version": context.policy_version,
     }
+    pipeline_attempt_id = get_pipeline_attempt_id()
+    if pipeline_attempt_id is not None:
+        metadata["pipeline_attempt_id"] = pipeline_attempt_id
     if authorization is not None:
         metadata["scope_authorization"] = authorization.to_metadata()
     if authentication is not None:
@@ -725,27 +755,34 @@ def _audit(
     logger = context.audit_logger
     if logger is None:
         return None
+    pipeline_attempt_id = get_pipeline_attempt_id()
+    evidence_metadata = (
+        {
+            **(
+                {"scope_authorization": authorization.to_metadata()}
+                if authorization is not None
+                else {}
+            ),
+            **(
+                {"session_authentication": authentication.to_metadata()}
+                if authentication is not None
+                else {}
+            ),
+        }
+        if result is None
+        else result.metadata
+    )
+    if pipeline_attempt_id is not None:
+        evidence_metadata = {
+            **evidence_metadata,
+            "pipeline_attempt_id": pipeline_attempt_id,
+        }
     return logger.record(
         tool,
         args,
         success=None if result is None else result.success,
         error=None if result is None else result.error,
-        metadata=(
-            {
-                **(
-                    {"scope_authorization": authorization.to_metadata()}
-                    if authorization is not None
-                    else {}
-                ),
-                **(
-                    {"session_authentication": authentication.to_metadata()}
-                    if authentication is not None
-                    else {}
-                ),
-            }
-            if result is None
-            else result.metadata
-        ),
+        metadata=evidence_metadata,
         session_id=context.session_id,
         phase=phase,
         request_id=context.request_id,
@@ -788,6 +825,7 @@ def _result_evidence(
             error=result.error,
             request_id=context.request_id,
             action_id=action_id,
+            pipeline_attempt_id=result.metadata.get("pipeline_attempt_id"),
             audit_attempt_event_id=None if attempt is None else attempt.event_id,
             audit_result_event_id=(
                 None if completed is None else completed.event_id
