@@ -39,6 +39,11 @@ Each dispatched action SHALL use exactly one immutable security-context snapshot
 - **WHEN** a context contains a validated project policy with supported `schema_version: 1`
 - **THEN** its policy-version label identifies project-policy schema version 1 for middleware result and audit correlation
 
+#### Scenario: Policy label does not create a versioned schema
+
+- **WHEN** a caller attempts to pair an arbitrary or legacy policy-version label with an absent or mismatched policy snapshot
+- **THEN** context validation rejects the mismatch because a label alone cannot validate or create a project-policy schema
+
 #### Scenario: Missing project policy uses built-in label
 
 - **WHEN** a context has no project policy file and uses built-in defaults
@@ -47,7 +52,7 @@ Each dispatched action SHALL use exactly one immutable security-context snapshot
 ### Requirement: Policy file schema and validation
 The system SHALL support an optional project-root policy file named `council.policy.yaml` with required integer `schema_version: 1`. The only project-policy fields supported by schema version 1 SHALL be `schema_version`, `allowed_commands` (list of string patterns), `denied_commands` (list of string patterns), and `denied_paths` (list of string path patterns). Missing or unsupported versions, unknown or misspelled fields, invalid field types, and malformed YAML SHALL reject the entire file before use without silently applying any subset. Validation diagnostics SHALL identify the file, schema-version problem when applicable, and offending field without echoing secret field values. When the file is absent, the system SHALL use built-in defaults without requiring a policy file.
 
-#### Scenario: Version 1 policy loads successfully
+#### Scenario: Valid policy loads successfully
 
 - **WHEN** `council.policy.yaml` declares integer `schema_version: 1` and contains only valid version 1 restriction fields
 - **THEN** the complete policy is accepted and available as a schema-versioned restriction snapshot
@@ -77,7 +82,7 @@ The system SHALL support an optional project-root policy file named `council.pol
 - **WHEN** an unsupported authorization-shaped field contains a secret-looking value
 - **THEN** the validation error identifies the field but does not contain its value
 
-#### Scenario: Invalid known field is rejected
+#### Scenario: Invalid policy is rejected
 
 - **WHEN** a version 1 policy gives a known field an invalid type
 - **THEN** loading fails with a validation error and the invalid file is not applied
@@ -105,7 +110,7 @@ When `allowed_commands` is present and non-empty, a shell command SHALL pass the
 - **WHEN** a dangerous action matches `allowed_commands` but later requires and fails confirmation
 - **THEN** the action remains denied and no subprocess starts
 
-#### Scenario: Empty allowlist means no additional allowlist restriction
+#### Scenario: Empty allowlist means no allowlist restriction
 
 - **WHEN** the active policy omits `allowed_commands` or sets it to an empty list
 - **THEN** shell commands are not refused solely for failing a project-policy allowlist, while all built-in and later gates remain in force
