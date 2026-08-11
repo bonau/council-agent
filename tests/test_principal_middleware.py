@@ -54,13 +54,13 @@ def test_context_without_principal_denies_and_audits_before_handler(
 
     assert result.success is False
     assert result.metadata["rejection_reason"] == "principal_missing"
-    assert result.metadata["authorization"]["scope_decision"] == "deny"
+    assert result.metadata["scope_authorization"]["scope_decision"] == "deny"
     assert handler.call_count == 0
     assert not target.exists()
     events = load_audit_events(audit_path)
     assert [event.phase for event in events] == ["attempt", "result"]
     assert all(
-        event.metadata["authorization"]["reason"] == "principal_missing"
+        event.metadata["scope_authorization"]["reason"] == "principal_missing"
         for event in events
     )
 
@@ -88,7 +88,7 @@ def test_read_only_principal_allows_read_and_denies_mutation_without_prompt(
     assert read_result.success is True
     assert write_result.success is False
     assert write_result.metadata["rejection_reason"] == "scope_insufficient"
-    assert write_result.metadata["authorization"]["missing_scopes"] == [
+    assert write_result.metadata["scope_authorization"]["missing_scopes"] == [
         "filesystem:mutate"
     ]
     assert target.read_text(encoding="utf-8") == "unchanged"
@@ -178,7 +178,7 @@ def test_scope_denial_precedes_project_policy_confirmation_and_process(
         result = run_command("mkdir marker")
 
     assert result.metadata["rejection_reason"] == "scope_insufficient"
-    assert result.metadata["authorization"]["missing_scopes"] == [
+    assert result.metadata["scope_authorization"]["missing_scopes"] == [
         "filesystem:mutate",
         "shell",
     ]
@@ -208,7 +208,7 @@ def test_read_only_run_tests_denial_starts_no_process_or_nested_action(
         result = run_tests(".")
 
     assert result.metadata["rejection_reason"] == "scope_insufficient"
-    assert result.metadata["authorization"]["missing_scopes"] == [
+    assert result.metadata["scope_authorization"]["missing_scopes"] == [
         "filesystem:mutate",
         "test",
     ]
@@ -257,10 +257,10 @@ def test_audit_masks_raw_principal_and_provider_credential_text(
     assert injected.success is False
     assert raw_principal not in raw_audit
     assert provider_secret not in raw_audit
-    assert first_attempt.metadata["authorization"]["principal_ref"] == (
+    assert first_attempt.metadata["scope_authorization"]["principal_ref"] == (
         principal.audit_ref
     )
-    assert first_result.metadata["authorization"]["principal_ref"] == (
+    assert first_result.metadata["scope_authorization"]["principal_ref"] == (
         principal.audit_ref
     )
     assert first_result.attempt_event_id == first_attempt.event_id
@@ -274,6 +274,6 @@ def test_authorization_metadata_is_json_serializable(tmp_path: Path) -> None:
     with without_security_context(), security_context(context):
         result = read_file("item.txt")
 
-    encoded = json.dumps(result.metadata["authorization"], sort_keys=True)
+    encoded = json.dumps(result.metadata["scope_authorization"], sort_keys=True)
     assert principal.principal_id not in encoded
     assert '"scope_decision": "allow"' in encoded

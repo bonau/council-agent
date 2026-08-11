@@ -389,7 +389,7 @@ def _correlation_metadata(
         "policy_version": context.policy_version,
     }
     if authorization is not None:
-        metadata["authorization"] = authorization.to_metadata()
+        metadata["scope_authorization"] = authorization.to_metadata()
     if context.session_id is not None:
         metadata["session_id"] = context.session_id
     return metadata
@@ -452,7 +452,7 @@ def _audit(
         success=None if result is None else result.success,
         error=None if result is None else result.error,
         metadata=(
-            {"authorization": authorization.to_metadata()}
+            {"scope_authorization": authorization.to_metadata()}
             if result is None and authorization is not None
             else {}
             if result is None

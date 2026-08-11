@@ -79,7 +79,7 @@ Alternative: place scope checks in each filesystem/shell helper. Rejected becaus
 
 ### 5. Store authorization evidence inside existing sanitized metadata
 
-Each middleware attempt and result receives an `authorization` metadata object:
+Each middleware attempt and result receives a `scope_authorization` metadata object (the generic `authorization` key remains reserved for secret-bearing HTTP credentials):
 
 - `principal_ref`: deterministic `sha256:` reference over issuer/kind/ID, truncated to a useful non-reversible identifier;
 - recognized principal kind;
