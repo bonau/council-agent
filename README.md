@@ -14,11 +14,12 @@ OpenRouter + CrewAI 三階段 CLI 框架：每次推論依序經過 **計劃 →
 - 指令分類：`read` / `write` / `dangerous` pattern 啟發式
 - 互動確認：危險／寫入 shell 與 `write_file`／`delete_file` 在 CLI 執行時需確認；`--yes` 跳過；無 TTY 預設拒絕
 - 結構化審計日誌：sandbox 已初始化時，tool 呼叫寫入 `.council/audit/events.jsonl`；可用 `council audit show`／`export` 檢視與匯出
+- 專案政策檔：可選根目錄 `council.policy.yaml`（允許／拒絕指令 pattern、額外敏感路徑）；以 Pydantic 驗證
 - Tool 呼叫追蹤與 `max_tool_calls` 上限（預設 50）
 - Verification 可接收結構化 tool 執行摘要（含 pytest 結果）
 - 可選 `.council/` sandbox：session 紀錄（`meta.json` + `tools.jsonl`）與跨 session 審計（`audit/events.jsonl`）
 
-> **安全提示**：`run_command` 使用 `shell=True`。指令分類為 pattern 啟發式；CLI 會對危險／寫入操作要求確認（或在無 TTY 時拒絕），CI 請加 `--yes`。審計日誌可追溯 tool 呼叫，但仍**不是**完整信任框架（尚無政策檔、Trust Tier、hash chain）。請僅在信任的專案目錄使用，並避免將不受信任的 prompt 直接餵給 Agent。後續規劃見 [ROADMAP.md](ROADMAP.md) v0.9+。
+> **安全提示**：`run_command` 使用 `shell=True`。指令分類為 pattern 啟發式；CLI 會對危險／寫入操作要求確認（或在無 TTY 時拒絕），CI 請加 `--yes`。可用 `council.policy.yaml` 覆寫允許／拒絕規則與敏感路徑，但仍**不是**完整信任框架（尚無 Trust Tier、`council trust`、Policy Middleware、hash chain）。請僅在信任的專案目錄使用，並避免將不受信任的 prompt 直接餵給 Agent。後續規劃見 [ROADMAP.md](ROADMAP.md) v1.0。
 
 ## Presets
 
@@ -89,6 +90,30 @@ uv run council audit export ./audit-s1.jsonl --session <session-id>
 ```
 
 Workspace 解析順序：`--workspace` > `.council/config.yaml` > `COUNCIL_WORKSPACE_ROOT` > 目前工作目錄。未初始化 sandbox 時管線仍可執行（向後相容），只是不會寫入 session 檔與審計日誌。
+
+### 專案政策檔（`council.policy.yaml`）
+
+可在專案根目錄放置可選的 `council.policy.yaml`，於 `council run` 時載入並覆寫預設規則（缺檔則沿用內建預設；格式錯誤會 fail-fast）：
+
+```yaml
+# 非空時作為 shell 指令允許清單（fnmatch，大小寫不敏感）
+allowed_commands:
+  - "pytest *"
+  - "python -m pytest *"
+  - "uv run pytest *"
+
+# 硬拒絕（優先於 allowlist）
+denied_commands:
+  - "rm -rf *"
+  - "curl *"
+  - "sudo *"
+
+# 額外敏感路徑（與內建 .env / .git / .council/secrets 聯集）
+denied_paths:
+  - "secrets/**"
+```
+
+v0.9 生效欄位僅上列三者。檔案中若出現 `trust_tier` 等未來欄位會被忽略且不驅動行為；Trust Tier／`council trust` 見 ROADMAP v1.0。
 
 ## 環境變數
 
