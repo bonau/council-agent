@@ -31,5 +31,5 @@
 - [x] 5.1 Run `uv run pytest` and record the full passing test count.
 - [x] 5.2 Run `npx @fission-ai/openspec@latest validate --changes --strict`.
 - [x] 5.3 Sync the security, tools, and orchestration deltas into main specs.
-- [ ] 5.4 Run `npx @fission-ai/openspec@latest validate --specs --strict`.
+- [x] 5.4 Run `npx @fission-ai/openspec@latest validate --specs --strict`.
 - [ ] 5.5 Run `./scripts/check.sh` with the active change, archive `trust-decision-matrix`, then run `./scripts/check.sh` again with no active change.
