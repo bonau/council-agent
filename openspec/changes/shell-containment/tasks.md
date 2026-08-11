@@ -32,7 +32,7 @@
 ## 4. Verification and OpenSpec completion
 
 - [x] 4.1 Run `uv run pytest` and record the full passing test count plus the positive, refusal, no-side-effect, and `run_tests` whitespace-path evidence.
-- [ ] 4.2 Run `npx @fission-ai/openspec@latest validate --changes --strict` and resolve every active-change validation error.
+- [x] 4.2 Run `npx @fission-ai/openspec@latest validate --changes --strict` and resolve every active-change validation error.
 - [ ] 4.3 Sync the `security` and `tools` deltas into `openspec/specs/`, then run `npx @fission-ai/openspec@latest validate --specs --strict` and resolve every main-spec validation error.
 - [ ] 4.4 Run `./scripts/check.sh` as the final combined gate and confirm pytest plus both strict OpenSpec validation modes pass on the same revision.
 - [ ] 4.5 Review the diff to confirm the v0.9.1 change contains no Trust Tier, `council trust`, unified dispatcher／`SecurityContext`, OS containment, release-version bump, or unrelated v0.9.x work.
