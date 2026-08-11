@@ -294,13 +294,17 @@ def test_run_council_installs_and_resets_project_policy(
     from pathlib import Path
 
     from council_agent.sandbox.config import apply_workspace_root
-    from council_agent.security import get_active_policy
+    from council_agent.security import (
+        POLICY_VERSION_PROJECT_V1,
+        get_active_policy,
+        get_security_context,
+    )
 
     monkeypatch.setenv("OPENROUTER_API_KEY", "test-key")
     apply_workspace_root(tmp_path)
     monkeypatch.chdir(tmp_path)
     (tmp_path / "council.policy.yaml").write_text(
-        "denied_commands:\n  - \"curl *\"\n",
+        "schema_version: 1\ndenied_commands:\n  - \"curl *\"\n",
         encoding="utf-8",
     )
 
@@ -314,11 +318,15 @@ def test_run_council_installs_and_resets_project_policy(
         summary="ok",
     )
     seen_denied: list[list[str]] = []
+    seen_versions: list[str] = []
 
     def _capture_exec(*_args, **_kwargs):
         policy = get_active_policy()
+        context = get_security_context()
         assert policy is not None
+        assert context is not None
         seen_denied.append(list(policy.denied_commands))
+        seen_versions.append(context.policy_version)
         return execution
 
     with (
@@ -337,6 +345,7 @@ def test_run_council_installs_and_resets_project_policy(
         )
 
     assert seen_denied == [["curl *"]]
+    assert seen_versions == [POLICY_VERSION_PROJECT_V1]
     assert get_active_policy() is None
 
 
@@ -354,20 +363,27 @@ def test_run_council_invalid_policy_fails_before_crews(
 
     import pytest
 
-    from council_agent.sandbox.config import apply_workspace_root
+    from council_agent.sandbox.config import apply_workspace_root, init_sandbox
     from council_agent.security import PolicyValidationError
 
     monkeypatch.setenv("OPENROUTER_API_KEY", "test-key")
+    init_sandbox(tmp_path)
     apply_workspace_root(tmp_path)
     monkeypatch.chdir(tmp_path)
     (tmp_path / "council.policy.yaml").write_text(
-        "denied_commands: not-a-list\n",
+        "schema_version: 1\ndenied_commands: not-a-list\n",
         encoding="utf-8",
     )
 
     preset = get_preset_by_name(PRESETS_DIR, "glm-stack")
 
     with (
+        patch(
+            "council_agent.orchestrator.SessionManager.create"
+        ) as mock_session_create,
+        patch(
+            "council_agent.orchestrator.SecurityContext.create"
+        ) as mock_context_create,
         patch("council_agent.orchestrator.run_planning") as mock_plan_run,
         patch("council_agent.orchestrator.run_execution") as mock_exec_run,
         patch("council_agent.orchestrator.run_verification") as mock_verify_run,
@@ -383,6 +399,65 @@ def test_run_council_invalid_policy_fails_before_crews(
     mock_plan_run.assert_not_called()
     mock_exec_run.assert_not_called()
     mock_verify_run.assert_not_called()
+    mock_session_create.assert_not_called()
+    mock_context_create.assert_not_called()
+    mock_plan_build.assert_not_called()
+    mock_exec_build.assert_not_called()
+    mock_verify_build.assert_not_called()
+
+
+@patch("council_agent.orchestrator.build_planning_crew")
+@patch("council_agent.orchestrator.build_execution_crew")
+@patch("council_agent.orchestrator.build_verification_crew")
+def test_run_council_unknown_policy_field_fails_before_runtime_state(
+    mock_verify_build: MagicMock,
+    mock_exec_build: MagicMock,
+    mock_plan_build: MagicMock,
+    tmp_path,
+    monkeypatch,
+) -> None:
+    from council_agent.sandbox.config import apply_workspace_root, init_sandbox
+    from council_agent.security import PolicyValidationError
+
+    monkeypatch.setenv("OPENROUTER_API_KEY", "test-key")
+    init_sandbox(tmp_path)
+    apply_workspace_root(tmp_path)
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "council.policy.yaml").write_text(
+        "\n".join(
+            [
+                "schema_version: 1",
+                "denied_commands:",
+                '  - "curl *"',
+                "trust_tier: 2",
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    preset = get_preset_by_name(PRESETS_DIR, "glm-stack")
+
+    with (
+        patch(
+            "council_agent.orchestrator.SessionManager.create"
+        ) as mock_session_create,
+        patch(
+            "council_agent.orchestrator.SecurityContext.create"
+        ) as mock_context_create,
+        pytest.raises(PolicyValidationError, match="trust_tier"),
+    ):
+        run_council(
+            "unknown policy field",
+            preset,
+            "fake-key",
+            project_root=tmp_path,
+        )
+
+    mock_session_create.assert_not_called()
+    mock_context_create.assert_not_called()
+    mock_plan_build.assert_not_called()
+    mock_exec_build.assert_not_called()
+    mock_verify_build.assert_not_called()
 
 
 @patch("council_agent.orchestrator.build_planning_crew")
@@ -489,7 +564,7 @@ def test_run_council_uses_one_security_context_snapshot(
     assert all(context is seen_contexts[0] for context in seen_contexts)
     context = seen_contexts[0]
     assert context.confirmation.mode is ConfirmMode.AUTO
-    assert context.policy_version == "v0.9-unversioned"
+    assert context.policy_version == "builtin"
     assert get_security_context() is None
 
 
