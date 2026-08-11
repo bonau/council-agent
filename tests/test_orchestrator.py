@@ -14,6 +14,8 @@ from council_agent.security import (
     without_security_context,
 )
 from council_agent.types import (
+    AttemptKind,
+    CouncilStopReason,
     ExecutionResult,
     PlanArtifact,
     VerdictStatus,
@@ -87,6 +89,10 @@ def test_run_council_pass_no_escalation(
     assert result.escalated is False
     assert result.final_output == "result"
     assert result.verdict.status == VerdictStatus.PASS
+    assert result.stop_reason is CouncilStopReason.PASSED
+    assert result.final_attempt_id == result.execution.attempt_id
+    assert len(result.attempts) == 1
+    assert result.attempts[0].kind is AttemptKind.INITIAL
 
 
 @patch("council_agent.orchestrator.build_planning_crew")
@@ -109,13 +115,20 @@ def test_run_council_fail_triggers_escalation(
         summary="Incomplete",
     )
     escalated = ExecutionResult(raw="fixed result")
+    pass_verdict = VerificationVerdict(
+        status=VerdictStatus.PASS,
+        raw='{"status": "PASS"}',
+        issues=[],
+        summary="Complete",
+    )
 
     with (
         patch("council_agent.orchestrator.run_planning", return_value=plan),
         patch("council_agent.orchestrator.run_execution", return_value=execution),
         patch(
-            "council_agent.orchestrator.run_verification", return_value=fail_verdict
-        ),
+            "council_agent.orchestrator.run_verification",
+            side_effect=[fail_verdict, pass_verdict],
+        ) as mock_verify,
         patch(
             "council_agent.orchestrator.run_escalation", return_value=escalated
         ) as mock_esc_run,
@@ -129,8 +142,125 @@ def test_run_council_fail_triggers_escalation(
 
     mock_esc_build.assert_called_once()
     mock_esc_run.assert_called_once()
+    assert mock_verify.call_count == 2
+    assert mock_verify.call_args.args[3] is escalated
     assert result.escalated is True
     assert result.final_output == "fixed result"
+    assert result.verdict is pass_verdict
+    assert result.stop_reason is CouncilStopReason.PASSED
+    assert len(result.attempts) == 2
+    assert [attempt.kind for attempt in result.attempts] == [
+        AttemptKind.INITIAL,
+        AttemptKind.ESCALATION,
+    ]
+    assert result.attempts[0].verdict is fail_verdict
+    assert result.attempts[1].execution is result.execution
+    assert result.attempts[1].verdict is result.verdict
+    assert result.final_attempt_id == result.attempts[1].attempt_id
+    assert result.attempts[0].attempt_id != result.attempts[1].attempt_id
+
+
+@patch("council_agent.orchestrator.build_planning_crew")
+@patch("council_agent.orchestrator.build_execution_crew")
+@patch("council_agent.orchestrator.build_verification_crew")
+@patch("council_agent.orchestrator.build_escalation_crew")
+def test_run_council_retry_exhaustion_keeps_final_fail(
+    mock_esc_build: MagicMock,
+    mock_verify_build: MagicMock,
+    mock_exec_build: MagicMock,
+    mock_plan_build: MagicMock,
+) -> None:
+    preset = get_preset_by_name(PRESETS_DIR, "glm-stack").model_copy(
+        update={"max_retries": 2}
+    )
+    plan = PlanArtifact(raw="{}", steps=["a"], success_criteria=[], risks=[])
+    initial = ExecutionResult(raw="initial")
+    escalations = [
+        ExecutionResult(raw="retry one"),
+        ExecutionResult(raw="retry two"),
+    ]
+    fail_verdicts = [
+        VerificationVerdict(
+            status=VerdictStatus.FAIL,
+            raw=f'{{"status":"FAIL","attempt":{index}}}',
+            issues=[f"still failing {index}"],
+            summary="failed",
+        )
+        for index in range(3)
+    ]
+
+    with (
+        patch("council_agent.orchestrator.run_planning", return_value=plan),
+        patch("council_agent.orchestrator.run_execution", return_value=initial),
+        patch(
+            "council_agent.orchestrator.run_escalation",
+            side_effect=escalations,
+        ) as mock_escalate,
+        patch(
+            "council_agent.orchestrator.run_verification",
+            side_effect=fail_verdicts,
+        ) as mock_verify,
+    ):
+        result = run_council(
+            "test prompt",
+            preset,
+            PROVIDER_CREDENTIAL,
+            TEST_PRINCIPAL,
+        )
+
+    assert mock_escalate.call_count == 2
+    assert mock_verify.call_count == 3
+    assert len(result.attempts) == 3
+    assert result.verdict is fail_verdicts[-1]
+    assert result.execution is escalations[-1]
+    assert result.final_output == "retry two"
+    assert result.final_attempt_id == escalations[-1].attempt_id
+    assert result.stop_reason is CouncilStopReason.RETRIES_EXHAUSTED
+    assert all(attempt.verdict.status is VerdictStatus.FAIL for attempt in result.attempts)
+
+
+@patch("council_agent.orchestrator.build_planning_crew")
+@patch("council_agent.orchestrator.build_execution_crew")
+@patch("council_agent.orchestrator.build_verification_crew")
+def test_run_council_zero_retries_retains_initial_fail(
+    mock_verify_build: MagicMock,
+    mock_exec_build: MagicMock,
+    mock_plan_build: MagicMock,
+) -> None:
+    preset = get_preset_by_name(PRESETS_DIR, "glm-stack").model_copy(
+        update={"max_retries": 0}
+    )
+    plan = PlanArtifact(raw="{}", steps=["a"], success_criteria=[], risks=[])
+    execution = ExecutionResult(raw="initial")
+    fail_verdict = VerificationVerdict(
+        status=VerdictStatus.FAIL,
+        raw='{"status":"FAIL"}',
+        issues=["failed"],
+        summary="failed",
+    )
+
+    with (
+        patch("council_agent.orchestrator.run_planning", return_value=plan),
+        patch("council_agent.orchestrator.run_execution", return_value=execution),
+        patch(
+            "council_agent.orchestrator.run_verification",
+            return_value=fail_verdict,
+        ),
+        patch("council_agent.orchestrator.build_escalation_crew") as escalation,
+    ):
+        result = run_council(
+            "test prompt",
+            preset,
+            PROVIDER_CREDENTIAL,
+            TEST_PRINCIPAL,
+        )
+
+    escalation.assert_not_called()
+    assert result.escalated is False
+    assert result.verdict is fail_verdict
+    assert result.final_output == "initial"
+    assert result.stop_reason is CouncilStopReason.RETRIES_DISABLED
+    assert len(result.attempts) == 1
 
 
 @patch("council_agent.orchestrator.build_planning_crew")

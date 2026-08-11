@@ -29,6 +29,7 @@ from council_agent.security import (
     TrustDecisionReason,
     evaluate_decision,
     load_audit_events,
+    pipeline_attempt,
     resolve_cli_confirm_mode,
     security_context,
     without_security_context,
@@ -61,11 +62,12 @@ def test_direct_and_crew_share_exact_matrix_evidence(tmp_path: Path) -> None:
     )
 
     with without_security_context(), security_context(context):
-        direct = write_file("blocked.txt", "blocked")
-        wrapped = _crew_tools()["write_file"].run(
-            path="blocked.txt",
-            content="blocked",
-        )
+        with pipeline_attempt("entrypoint-attempt"):
+            direct = write_file("blocked.txt", "blocked")
+            wrapped = _crew_tools()["write_file"].run(
+                path="blocked.txt",
+                content="blocked",
+            )
 
     result_events = [
         event for event in load_audit_events(audit_path) if event.phase == "result"
@@ -73,6 +75,9 @@ def test_direct_and_crew_share_exact_matrix_evidence(tmp_path: Path) -> None:
     assert direct.metadata["trust_decision"]["reason"] == "scope_insufficient"
     assert wrapped.startswith("ERROR:")
     assert len(result_events) == 2
+    assert {
+        event.metadata["pipeline_attempt_id"] for event in result_events
+    } == {"entrypoint-attempt"}
     assert (
         result_events[0].metadata["trust_decision"]
         == result_events[1].metadata["trust_decision"]

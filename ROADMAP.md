@@ -4,7 +4,7 @@
 
 > **開發方式**：所有版本里程碑的實作，皆採 **Spec-driven Development** 並搭配 [OpenSpec](https://github.com/Fission-AI/OpenSpec)。每個 feature 分支應對應一個 OpenSpec change，詳見 [AGENTS.md](AGENTS.md)。
 
-## 現況（v0.9.8）
+## 現況（v0.9.9 implementation candidate；package metadata 仍為 v0.9.8）
 
 | 能力 | 狀態 |
 |------|------|
@@ -23,12 +23,14 @@
 | 互動確認（`--yes`／TTY ask／無 TTY refuse） | ✅ |
 | 審計日誌（`.council/audit/` + `council audit show`／`export`） | ✅ |
 | 政策設定檔（`council.policy.yaml`） | ✅ |
+| Verification／escalation attempt evidence closure | ✅（v0.9.9 implementation） |
+| Trust Tier decision matrix | ✅（matrix-v1；未啟用 tier runtime） |
 | Trust Tier | ❌（v1.0） |
 
-v0.9 已發佈：可選專案根目錄 `council.policy.yaml` 自訂允許／拒絕指令 pattern 與額外敏感路徑；`run_command` 與 `WorkspaceGuard` 會套用政策。指令分類、互動確認與審計能力保留；Trust Tier 與完整 Policy Middleware 見 v1.0。
+已發佈基線 v0.9.8 具 mandatory dispatcher、restrict-only project policy、scoped principal、high-risk authentication、user-owned grant store foundation、matrix-v1 decision 與 redacted／sequenced per-event audit integrity。v0.9.9 implementation 另關閉 escalation 後未重新 Verification 與跨 attempt evidence 對不齊；package version bump／tag 仍只可在 `release/0.9.9` 進行。
 
-> **v1.0 準備（2026-08-11）**：進入 Trust Tier 前須先以 **v0.9.1–v0.9.9** 清債。詳見 [docs/releases/major-release-prep-playbook.md](docs/releases/major-release-prep-playbook.md)、[docs/releases/v1.0-alpha-known-issues.md](docs/releases/v1.0-alpha-known-issues.md)。  
-> 已知限制：shell 非 OS sandbox；classifier 未知指令 fail-open 為 `read`；ConfirmMode ≠ Trust Tier；audit 無 hash chain／secret redaction；project policy 位於 Agent 可寫路徑。
+> **v1.0 準備（2026-08-11）**：**v0.9.1–v0.9.9 implementation 清債序列已完成並停止**。下一動作只能另開 v1.0-alpha Trust Tier change；是否進入 alpha 仍須依 release/tag、獨立真人／Agent 手冊與 admission gate 決定。詳見 [docs/releases/major-release-prep-playbook.md](docs/releases/major-release-prep-playbook.md)、[docs/releases/v1.0-alpha-known-issues.md](docs/releases/v1.0-alpha-known-issues.md)。
+> 已知限制：shell／WorkspaceGuard 非 OS sandbox；`run_tests` 會執行 project code；ConfirmMode／`--yes` ≠ Trust Tier；grant store 尚未接產品 tool；audit 有 redaction、sequence 與 canonical per-event ID，但無 predecessor-linked／external anchor；Verification evidence requirement 使用保守 lexical rule。
 
 ## 目標里程碑
 
@@ -240,7 +242,7 @@ uv run council sandbox status
 | v0.9.8 | Trust Tier decision matrix（與 ConfirmMode 分離） | 決策表可測；不啟用 Tier runtime |
 | v0.9.9 | Verification／escalation evidence closure + 文件校正 | escalation 後重新驗證；宣稱與邊界一致 |
 
-**v1.0-alpha 准入**：v0.9.1–v0.9.9 全數發佈；已知問題清單中 P0／P1 已關閉並有證據；`./scripts/check.sh` 通過；真人與 Agent 測試手冊已走通。
+**v1.0-alpha 准入**：v0.9.1–v0.9.9 全數發佈；已知問題清單中 P0／P1 已關閉並有證據；`./scripts/check.sh` 通過；真人與 Agent 測試手冊已由獨立執行者走通。完成 v0.9.9 feature implementation 不等於自動滿足這些 release/admission 條件。
 
 **v1.0-beta 准入**：alpha 功能完成並 archive；P0 全關；公開測試文件就緒；公告固定 beta tag／commit。
 
@@ -414,4 +416,4 @@ v0.1.0
 
 ---
 
-*最後更新：2026-08-11 · 策略：Tool-First 漸進式 · v0.9.x 清債後進入 v1.0-alpha · 開發方式：Spec-driven + OpenSpec*
+*最後更新：2026-08-11 · 策略：Tool-First 漸進式 · v0.9.x implementation 清債序列停止；v1.0-alpha 另開 change · 開發方式：Spec-driven + OpenSpec*
