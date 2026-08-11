@@ -2,10 +2,16 @@
 
 from __future__ import annotations
 
+import json
+import os
 import sys
+import uuid
+from datetime import datetime, timezone
 from pathlib import Path
+from typing import Any
 
 import typer
+from pydantic import SecretStr
 from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
@@ -25,6 +31,10 @@ from council_agent.security import (
     AuditIntegrityError,
     AuditIntegrityReport,
     AuditRecord,
+    TrustGrant,
+    TrustGrantStore,
+    TrustStoreError,
+    TrustStoreReason,
     default_audit_events_path,
     export_audit_events,
     filter_audit_events,
@@ -41,9 +51,13 @@ app = typer.Typer(
 presets_app = typer.Typer(help="Manage model presets.")
 sandbox_app = typer.Typer(help="Manage local sandbox workspace and sessions.")
 audit_app = typer.Typer(help="Show and export structured tool audit logs.")
+trust_app = typer.Typer(
+    help="Manage the authenticated user-owned trust grant store (not Trust Tier)."
+)
 app.add_typer(presets_app, name="presets")
 app.add_typer(sandbox_app, name="sandbox")
 app.add_typer(audit_app, name="audit")
+app.add_typer(trust_app, name="trust")
 console = Console()
 
 def _configure_workspace(workspace: Path | None) -> Path:
@@ -325,6 +339,299 @@ def audit_export(
             border_style="green",
         )
     )
+
+
+_DEFAULT_CLI_PRINCIPAL_SCOPES = (
+    "read,filesystem:mutate,test,shell,high-risk:manage"
+)
+
+
+def _trust_identity() -> tuple[Any, SecretStr]:
+    """Load host-process trust identity without reading project `.env`."""
+
+    raw_verifier = os.environ.get("COUNCIL_AUTH_SECRET")
+    if raw_verifier is None or not raw_verifier:
+        raise TrustStoreError(
+            "COUNCIL_AUTH_SECRET is required for trust-store administration",
+            reason=TrustStoreReason.AUTHENTICATION_MISSING,
+        )
+    principal = local_cli_principal(
+        os.environ.get("COUNCIL_PRINCIPAL_ID") or None,
+        os.environ.get(
+            "COUNCIL_PRINCIPAL_SCOPES",
+            _DEFAULT_CLI_PRINCIPAL_SCOPES,
+        ),
+    )
+    return principal, SecretStr(raw_verifier)
+
+
+def _trust_runtime(
+    workspace: Path | None,
+) -> tuple[
+    TrustGrantStore,
+    Any,
+    Any,
+    Any,
+    str,
+    str,
+]:
+    """Build one provider-independent, authenticated trust command runtime."""
+
+    principal, verifier = _trust_identity()
+    project = Path(workspace).resolve() if workspace is not None else Path.cwd().resolve()
+    store = TrustGrantStore(project)
+    request_id = str(uuid.uuid4())
+    session_id = str(uuid.uuid4())
+    manager, provider = store.service_authentication(
+        verifier,
+        request_id=request_id,
+        session_id=session_id,
+    )
+    return store, principal, manager, provider, request_id, session_id
+
+
+def _parse_trust_resource(value: str) -> dict[str, Any]:
+    try:
+        parsed = json.loads(value)
+    except json.JSONDecodeError as exc:
+        raise ValueError("Trust resource must be valid JSON") from exc
+    if not isinstance(parsed, dict):
+        raise ValueError("Trust resource must be a JSON object")
+    return parsed
+
+
+def _parse_trust_expiry(value: str | None) -> datetime | None:
+    if value is None:
+        return None
+    normalized = f"{value[:-1]}+00:00" if value.endswith("Z") else value
+    try:
+        parsed = datetime.fromisoformat(normalized)
+    except ValueError as exc:
+        raise ValueError("Trust expiry must be an ISO-8601 datetime") from exc
+    if parsed.tzinfo is None or parsed.utcoffset() is None:
+        raise ValueError("Trust expiry must include a timezone")
+    return parsed
+
+
+def _trust_failure(error: Exception) -> None:
+    reason = (
+        f"\n[bold]Reason:[/bold] {error.reason.value}"
+        if isinstance(error, TrustStoreError)
+        else ""
+    )
+    console.print(
+        Panel(
+            f"{error}{reason}",
+            title="Trust Store Error",
+            border_style="red",
+        )
+    )
+    raise typer.Exit(code=1) from error
+
+
+@trust_app.command("grant")
+def trust_grant(
+    action: str = typer.Argument(
+        ...,
+        help="Exact recognized top-level action (for example read_file).",
+    ),
+    resource: str = typer.Argument(
+        ...,
+        help='Exact JSON resource object (for example {"path":"README.md"}).',
+    ),
+    scopes: list[str] = typer.Option(
+        ...,
+        "--scope",
+        "-s",
+        help="Grant scope; repeat for multiple exact scopes.",
+    ),
+    expires_at: str | None = typer.Option(
+        None,
+        "--expires-at",
+        help="Optional timezone-aware ISO-8601 expiry.",
+    ),
+    workspace: Path | None = typer.Option(
+        None,
+        "--workspace",
+        "-w",
+        help="Workspace used only to enforce store separation (default: cwd).",
+        exists=True,
+        file_okay=False,
+        dir_okay=True,
+        resolve_path=True,
+    ),
+) -> None:
+    """Create one exact self-grant; does not enable Trust Tier runtime."""
+
+    try:
+        parsed_resource = _parse_trust_resource(resource)
+        expiry = _parse_trust_expiry(expires_at)
+        (
+            store,
+            principal,
+            manager,
+            provider,
+            request_id,
+            session_id,
+        ) = _trust_runtime(workspace)
+        grant = store.grant(
+            principal,
+            action,
+            parsed_resource,
+            scopes,
+            expires_at=expiry,
+            session_id=session_id,
+            request_id=request_id,
+            authentication_manager=manager,
+            step_up_provider=provider,
+        )
+    except (TrustStoreError, TypeError, ValueError) as exc:
+        _trust_failure(exc)
+        return
+    console.print(
+        Panel(
+            f"[bold]Grant ID:[/bold] {grant.grant_id}\n"
+            f"[bold]Principal:[/bold] {grant.principal_ref}\n"
+            f"[bold]Action:[/bold] {grant.action}\n"
+            f"[bold]Resource:[/bold] {grant.canonical_resource}\n"
+            f"[bold]Scopes:[/bold] "
+            f"{', '.join(scope.value for scope in grant.scopes)}\n"
+            f"[bold]Expires:[/bold] "
+            f"{grant.expires_at.isoformat() if grant.expires_at else 'never'}\n"
+            "[bold]Runtime:[/bold] store only; Trust Tier is not enabled",
+            title="Trust Grant Created",
+            border_style="green",
+        )
+    )
+
+
+@trust_app.command("revoke")
+def trust_revoke(
+    grant_id: str = typer.Argument(..., help="Exact grant ID to revoke."),
+    workspace: Path | None = typer.Option(
+        None,
+        "--workspace",
+        "-w",
+        help="Workspace used only to enforce store separation (default: cwd).",
+        exists=True,
+        file_okay=False,
+        dir_okay=True,
+        resolve_path=True,
+    ),
+) -> None:
+    """Persistently revoke one self-owned grant."""
+
+    try:
+        (
+            store,
+            principal,
+            manager,
+            provider,
+            request_id,
+            session_id,
+        ) = _trust_runtime(workspace)
+        grant = store.revoke(
+            principal,
+            grant_id,
+            session_id=session_id,
+            request_id=request_id,
+            authentication_manager=manager,
+            step_up_provider=provider,
+        )
+    except (TrustStoreError, TypeError, ValueError) as exc:
+        _trust_failure(exc)
+        return
+    console.print(
+        Panel(
+            f"[bold]Grant ID:[/bold] {grant.grant_id}\n"
+            f"[bold]Revoked at:[/bold] {grant.revoked_at.isoformat()}\n"
+            "[bold]Effective:[/bold] immediately; persisted across restart",
+            title="Trust Grant Revoked",
+            border_style="yellow",
+        )
+    )
+
+
+@trust_app.command("list")
+def trust_list(
+    include_inactive: bool = typer.Option(
+        False,
+        "--all",
+        help="Include expired and revoked records.",
+    ),
+    workspace: Path | None = typer.Option(
+        None,
+        "--workspace",
+        "-w",
+        help="Workspace used only to enforce store separation (default: cwd).",
+        exists=True,
+        file_okay=False,
+        dir_okay=True,
+        resolve_path=True,
+    ),
+) -> None:
+    """List authenticated principal-owned grants from the user store."""
+
+    try:
+        (
+            store,
+            principal,
+            manager,
+            provider,
+            request_id,
+            session_id,
+        ) = _trust_runtime(workspace)
+        grants = store.list(
+            principal,
+            include_inactive=include_inactive,
+            session_id=session_id,
+            request_id=request_id,
+            authentication_manager=manager,
+            step_up_provider=provider,
+        )
+    except (TrustStoreError, TypeError, ValueError) as exc:
+        _trust_failure(exc)
+        return
+    if not grants:
+        console.print(
+            Panel(
+                f"No {'matching' if include_inactive else 'active'} trust grants.\n"
+                f"Principal: {principal.audit_ref}\n"
+                f"Store: {store.root}\n"
+                "Trust Tier runtime is not enabled.",
+                title="Trust Grants",
+                border_style="yellow",
+            )
+        )
+        return
+
+    table = Table(title=f"Trust grants ({len(grants)}; store only)")
+    table.add_column("ID", style="cyan", overflow="fold")
+    table.add_column("Action")
+    table.add_column("Resource", overflow="fold")
+    table.add_column("Scopes", overflow="fold")
+    table.add_column("Status")
+    table.add_column("Expires")
+    now = datetime.now(timezone.utc)
+    for grant in grants:
+        table.add_row(
+            grant.grant_id,
+            grant.action,
+            grant.canonical_resource,
+            ",".join(scope.value for scope in grant.scopes),
+            _trust_grant_status(grant, now),
+            grant.expires_at.isoformat() if grant.expires_at else "never",
+        )
+    console.print(table)
+    console.print("[dim]Store foundation only; Trust Tier runtime is not enabled.[/dim]")
+
+
+def _trust_grant_status(grant: TrustGrant, now: datetime) -> str:
+    if grant.revoked_at is not None:
+        return "revoked"
+    if grant.expires_at is not None and now >= grant.expires_at:
+        return "expired"
+    return "active"
 
 
 @app.command("run")
