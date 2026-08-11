@@ -870,16 +870,37 @@ Each matrix state SHALL map to a documented stable reason code. Product result, 
 - **WHEN** matrix evidence is serialized
 - **THEN** it contains only enum states, risk, interaction, version, outcome, and stable reasons, without raw principal IDs, resources, credentials, challenges, tokens, or grant IDs
 
-### Requirement: v0.9.8 does not enable Trust Tier runtime
-The decision contract SHALL be usable by a future Trust Tier runtime without defining or enabling Tier 0/1/2 selection in v0.9.8. Product contexts in this version SHALL represent runtime grant consumption as not required unless an explicit test or future caller supplies a complete grant disposition; persisted grants SHALL NOT be consumed automatically. No `--trust-tier` option SHALL be exposed.
 
-#### Scenario: Stored grant remains disconnected from product tools
-- **WHEN** a v0.9.8 product tool action runs while the user-owned store contains a matching grant
-- **THEN** the dispatcher does not load that store or convert the record into runtime authority
+### Requirement: Trust Tier runtime selects confirmation and optional grant consumption
+Product security contexts SHALL carry an explicit Trust Tier of `0`, `1`, or `2` (default `0`). The dispatcher SHALL translate the tier, canonical action risk, and optional exact grant lookup into matrix grant and interaction inputs without reordering matrix version 1 deny precedence. Tier 0 SHALL require confirmation for every risk including read and SHALL NOT skip confirmation via grant. Tier 1 SHALL allow read without confirmation; SHALL allow mutate without confirmation only when an exact matching grant is valid; and SHALL still require confirmation for high-risk after authentication. Tier 2 SHALL auto-approve interaction after authority gates pass, recording a valid grant when present and `trust_grant_not_required` when absent without denying for absence. Selecting Tier 2 SHALL require principal scope `high-risk:manage` and a fresh high-risk step-up authentication before the context is used for product tools. `--yes` and `ConfirmMode` SHALL remain interaction-only and SHALL NOT select a tier or create a grant. Exact grant lookup SHALL occur only on the mandatory dispatcher path.
 
-#### Scenario: No tier CLI exists
-- **WHEN** a user inspects `council run` options in v0.9.8
-- **THEN** no `--trust-tier` option or Tier 0/1/2 runtime behavior is available
+#### Scenario: Default Tier 0 confirms reads
+- **WHEN** a product read tool runs under Tier 0 without automatic confirmation approval
+- **THEN** the action requires confirmation and is not executed until interaction allows it
+
+#### Scenario: Tier 1 mutate uses exact grant to skip confirmation
+- **WHEN** Tier 1 mutate runs with an exact matching active grant for the principal, action, resource, and required scopes
+- **THEN** the matrix grant state is allowed, interaction is treated as automatic approval, and the handler may run without a prompt
+
+#### Scenario: Tier 1 mutate without grant still confirms
+- **WHEN** Tier 1 mutate runs and lookup finds no matching grant
+- **THEN** grant state is not required, confirmation follows `ConfirmMode`, and `--yes` only supplies automatic interaction
+
+#### Scenario: Invalid grant remains denying under Tier 1
+- **WHEN** Tier 1 mutate lookup returns revoked, expired, invalid, or scope-insufficient for the exact action
+- **THEN** the matrix denies for the grant reason and confirmation or `--yes` cannot allow the action
+
+#### Scenario: Tier cannot override earlier denial
+- **WHEN** policy, scope, or authentication denies an action under any Trust Tier including Tier 2 with `--yes`
+- **THEN** the matrix keeps the earlier denial reason and the handler does not run
+
+#### Scenario: Tier 2 selection requires step-up
+- **WHEN** a caller requests Trust Tier 2 without fresh high-risk authentication or without `high-risk:manage`
+- **THEN** the product path refuses to install or use that Tier 2 context for tools
+
+#### Scenario: Persisted grant is looked up only through the dispatcher
+- **WHEN** a product tool action runs under a tier that may consume grants
+- **THEN** exact lookup occurs on the mandatory dispatcher path and Crew adapters do not perform a parallel grant decision
 
 ### Requirement: Dispatcher evidence carries pipeline attempt correlation
 While execution or escalation is active, every dispatcher-owned tool result, tracker summary, session tool record, and durable audit attempt/result SHALL carry the same non-empty pipeline attempt identifier in addition to existing request/action/session correlation. The identifier SHALL label orchestration evidence only and SHALL NOT create authority, authentication, a trust grant, a Trust Tier selection, or a second security decision.

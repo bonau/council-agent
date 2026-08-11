@@ -35,11 +35,13 @@ from council_agent.security import (
     TrustGrantStore,
     TrustStoreError,
     TrustStoreReason,
+    TrustTier,
     default_audit_events_path,
     export_audit_events,
     filter_audit_events,
     load_audit_events_with_integrity,
     local_cli_principal,
+    parse_trust_tier,
     resolve_cli_confirm_mode,
 )
 
@@ -665,8 +667,17 @@ def run(
         "-y",
         help=(
             "Skip interaction prompts for dangerous/write operations (CI) only; "
-            "does not grant scopes, authenticate, create a trust grant, or "
-            "elevate privilege."
+            "does not grant scopes, authenticate, create a trust grant, select "
+            "a Trust Tier, or elevate privilege."
+        ),
+    ),
+    trust_tier: int = typer.Option(
+        int(TrustTier.TIER_0),
+        "--trust-tier",
+        help=(
+            "Trust Tier 0/1/2 for this run (default 0). Independent of --yes and "
+            "of `council trust` store administration. Tier 2 requires "
+            "high-risk:manage and fresh step-up authentication."
         ),
     ),
 ) -> None:
@@ -677,6 +688,7 @@ def run(
     selected = get_preset_by_name(settings.presets_dir, preset_name)
     confirm_mode = resolve_cli_confirm_mode(yes=yes, is_tty=sys.stdin.isatty())
     try:
+        selected_tier = parse_trust_tier(trust_tier)
         provider_credential = OpenRouterCredential(
             settings.openrouter_api_key.get_secret_value(),
         )
@@ -688,7 +700,7 @@ def run(
         console.print(
             Panel(
                 str(exc),
-                title="Principal Configuration Error",
+                title="Configuration Error",
                 border_style="red",
             )
         )
@@ -711,6 +723,7 @@ def run(
             f"[bold]Preset:[/bold] {selected.name}\n"
             f"[bold]Workspace:[/bold] {settings.council_workspace_root}\n"
             f"[bold]Confirm:[/bold] {confirm_mode.value}\n"
+            f"[bold]Trust tier:[/bold] {int(selected_tier)}\n"
             f"[bold]Principal:[/bold] {principal.audit_ref}\n"
             f"[bold]Scopes:[/bold] {scope_summary}\n"
             f"[bold]High-risk step-up:[/bold] {step_up_status}\n"
@@ -720,16 +733,23 @@ def run(
         )
     )
 
-    with console.status("[bold green]Running council pipeline..."):
-        result = run_council(
-            prompt=prompt,
-            preset=selected,
-            provider_credential=provider_credential,
-            principal=principal,
-            verbose=verbose,
-            confirm_mode=confirm_mode,
-            authentication_verifier=authentication_verifier,
+    try:
+        with console.status("[bold green]Running council pipeline..."):
+            result = run_council(
+                prompt=prompt,
+                preset=selected,
+                provider_credential=provider_credential,
+                principal=principal,
+                verbose=verbose,
+                confirm_mode=confirm_mode,
+                authentication_verifier=authentication_verifier,
+                trust_tier=selected_tier,
+            )
+    except ValueError as exc:
+        console.print(
+            Panel(str(exc), title="Trust Tier Error", border_style="red")
         )
+        raise typer.Exit(code=2) from exc
 
     if verbose:
         console.print(Panel(result.plan.raw, title="Planning", border_style="yellow"))

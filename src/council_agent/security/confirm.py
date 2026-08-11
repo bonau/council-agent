@@ -35,6 +35,9 @@ class ActionKind(str, Enum):
     WRITE_SHELL = "write_shell"
     WRITE_FILE = "write_file"
     DELETE_FILE = "delete_file"
+    READ_FILE = "read_file"
+    READ_SHELL = "read_shell"
+    RUN_TESTS = "run_tests"
 
 
 @dataclass(frozen=True)
@@ -130,6 +133,7 @@ def _needs_confirmation(kind: ActionKind, mode: ConfirmMode) -> bool:
         ActionKind.WRITE_SHELL,
         ActionKind.WRITE_FILE,
         ActionKind.DELETE_FILE,
+        ActionKind.RUN_TESTS,
     }
 
 
@@ -142,12 +146,18 @@ def evaluate_confirmation(
     policy: ConfirmationPolicy,
     kind: ActionKind,
     detail: str,
+    *,
+    force: bool = False,
+    auto_approve: bool = False,
 ) -> ConfirmationResult:
     """Evaluate one action against an explicit confirmation-policy snapshot."""
 
+    if auto_approve:
+        return ConfirmationResult(allowed=True, outcome=ConfirmationOutcome.AUTO)
+
     mode = policy.mode
 
-    if not _needs_confirmation(kind, mode):
+    if not force and not _needs_confirmation(kind, mode):
         return ConfirmationResult(allowed=True, outcome=ConfirmationOutcome.COMPAT_ALLOW)
 
     if mode is ConfirmMode.AUTO:
@@ -162,3 +172,32 @@ def evaluate_confirmation(
     if confirm_fn(message):
         return ConfirmationResult(allowed=True, outcome=ConfirmationOutcome.APPROVED)
     return ConfirmationResult(allowed=False, outcome=ConfirmationOutcome.DENIED)
+
+
+def evaluate_tier_aware_confirmation(
+    policy: ConfirmationPolicy,
+    kind: ActionKind,
+    detail: str,
+) -> ConfirmationResult:
+    """Apply active Trust Tier translation on top of ConfirmMode."""
+
+    from council_agent.security.trust import get_active_tier_translation
+
+    translation = get_active_tier_translation()
+    if translation is None:
+        return evaluate_confirmation(policy, kind, detail)
+    if translation.auto_approve_interaction:
+        return evaluate_confirmation(
+            policy,
+            kind,
+            detail,
+            auto_approve=True,
+        )
+    if translation.require_confirmation:
+        return evaluate_confirmation(
+            policy,
+            kind,
+            detail,
+            force=True,
+        )
+    return evaluate_confirmation(policy, kind, detail)

@@ -136,20 +136,17 @@ def test_cli_auto_interaction_cannot_override_invalid_grant() -> None:
     assert decision.reason is TrustDecisionReason.TRUST_GRANT_INVALID
 
 
-def test_run_help_documents_yes_boundary_and_no_trust_tier() -> None:
+def test_run_help_documents_yes_boundary_and_trust_tier() -> None:
     result = runner.invoke(app, ["run", "--help"])
-    rejected_tier = runner.invoke(
-        app,
-        ["run", "task", "--trust-tier", "2"],
-    )
     help_text = result.output.lower()
 
+    compact = " ".join(result.output.lower().split())
     assert result.exit_code == 0, result.output
     assert "--yes" in result.output
-    assert "interaction prompts" in help_text
-    assert "does not grant scopes" in help_text
-    assert "authenticate" in help_text
-    assert "trust grant" in help_text
-    assert "elevate privilege" in help_text
-    assert "--trust-tier" not in result.output
-    assert rejected_tier.exit_code != 0
+    assert "--trust-tier" in result.output
+    assert "interaction prompts" in compact
+    assert "grant scopes" in compact
+    assert "authenticate" in compact
+    assert "trust grant" in compact
+    assert "elevate privilege" in compact
+    assert "independent of --yes" in compact

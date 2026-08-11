@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Any
 
-TRUST_DECISION_MATRIX_VERSION = 1
+TRUST_DECISION_MATRIX_VERSION = 2
 
 
 class PolicyState(str, Enum):
@@ -234,13 +234,13 @@ def evaluate_decision(vector: DecisionVector) -> TrustDecision:
         )
 
     if vector.risk is ActionRisk.READ:
-        if vector.interaction is not InteractionState.NOT_REQUIRED:
-            raise ValueError("Read-risk decisions cannot use interaction authority")
-        return _decision(
-            TrustDecisionOutcome.ALLOW,
-            TrustDecisionReason.ALLOWED,
-            vector,
-        )
+        if vector.interaction is InteractionState.NOT_REQUIRED:
+            return _decision(
+                TrustDecisionOutcome.ALLOW,
+                TrustDecisionReason.ALLOWED,
+                vector,
+            )
+        # Matrix v2: Trust Tier 0 may require confirmation for reads.
 
     if vector.interaction is InteractionState.PENDING:
         return _decision(

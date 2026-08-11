@@ -5,7 +5,7 @@ v0.9.x closed the debt sequence and matrix-v1 contract, but product tools still 
 ## What Changes
 
 - Add typed Trust Tier 0/1/2 selection on `SecurityContext` and CLI `council run --trust-tier`.
-- Add a pure tier→grant/interaction translator that feeds matrix-v1 without changing policy→scope→authentication→grant→risk→interaction precedence.
+- Add a pure tier→grant/interaction translator that feeds the trust matrix without changing policy→scope→authentication→grant→risk→interaction precedence; bump matrix to v2 so Tier 0 may apply interaction to read risk.
 - Connect explicit `TrustGrantStore.lookup` on the product path when the tier may consume an exact grant (Tier 1 mutate auto-skip; optional Tier 2 evidence).
 - Require fresh high-risk step-up (and `high-risk:manage`) to select Tier 2; default remains Tier 0.
 - Keep `ConfirmMode` / `--yes` as interaction-only; update help, docs, tests, and release evidence for `v1.0.0-alpha.1`.

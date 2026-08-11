@@ -47,7 +47,7 @@ Filesystem/shell read paths currently skip confirmation. Dispatcher applies tier
 
 ### Evidence
 
-`metadata.trust_decision` continues to carry matrix-v1 vector. Add non-secret `metadata.trust_tier` and retain existing grant lookup metadata when a lookup runs. No matrix version bump unless a new reason code is required (not expected).
+`metadata.trust_decision` carries matrix **v2** (same dimensions/precedence; read risk may now use interaction so Tier 0 can confirm reads). Add non-secret `metadata.trust_tier` and retain grant lookup metadata when a lookup runs.
 
 ## Risks / Trade-offs
 
