@@ -50,6 +50,12 @@ class CouncilPolicy(BaseModel):
     denied_paths: list[str] = Field(default_factory=list)
 
 
+@dataclass(frozen=True)
+class _ActivePolicyToken:
+    legacy: Token[CouncilPolicy | None]
+    context: object | None
+
+
 _ACTIVE_POLICY: ContextVar[CouncilPolicy | None] = ContextVar(
     "council_active_policy",
     default=None,
@@ -93,15 +99,36 @@ def load_policy_file(project_root: Path | str) -> CouncilPolicy | None:
 
 
 def get_active_policy() -> CouncilPolicy | None:
+    from council_agent.security.middleware import get_security_context
+
+    context = get_security_context()
+    if context is not None:
+        try:
+            context.validate(require_active=True)
+        except RuntimeError:
+            pass
+        else:
+            return context.policy
     return _ACTIVE_POLICY.get()
 
 
-def set_active_policy(policy: CouncilPolicy | None) -> Token[CouncilPolicy | None]:
-    return _ACTIVE_POLICY.set(policy)
+def set_active_policy(policy: CouncilPolicy | None) -> _ActivePolicyToken:
+    from council_agent.security.middleware import _set_security_context_view
+
+    legacy_token = _ACTIVE_POLICY.set(policy)
+    try:
+        context_token = _set_security_context_view(policy=policy)
+    except Exception:
+        _ACTIVE_POLICY.reset(legacy_token)
+        raise
+    return _ActivePolicyToken(legacy=legacy_token, context=context_token)
 
 
-def reset_active_policy(token: Token[CouncilPolicy | None]) -> None:
-    _ACTIVE_POLICY.reset(token)
+def reset_active_policy(token: _ActivePolicyToken) -> None:
+    from council_agent.security.middleware import _reset_security_context_view
+
+    _reset_security_context_view(token.context)
+    _ACTIVE_POLICY.reset(token.legacy)
 
 
 @contextmanager

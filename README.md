@@ -13,13 +13,14 @@ OpenRouter + CrewAI 三階段 CLI 框架：每次推論依序經過 **計劃 →
 - `WorkspaceGuard`：filesystem tools、`run_command` 的 cwd 與受支援命令路徑運算元都驗證工作區、敏感路徑及 symlink 邊界
 - 指令分析：明確支援的 simple-command registry 分類為 `read` / `write` / `dangerous`；未知、混淆或無法解析的形式 fail-closed
 - 互動確認：危險／寫入 shell 與 `write_file`／`delete_file` 在 CLI 執行時需確認；`--yes` 跳過確認（**不是** Trust Tier 或已驗證授權）；無 TTY 預設拒絕
-- 結構化審計日誌：sandbox 已初始化時，CrewAI wrapper 路徑寫入 `.council/audit/events.jsonl`；可用 `council audit show`／`export`（尚無 hash chain／secret redaction）
+- 唯一 Policy Middleware：所有 public tool／CrewAI 呼叫經同一 dispatcher 與單一 `SecurityContext`；缺少或已 cleanup 的 context fail-closed
+- 結構化審計日誌：sandbox 已初始化時，middleware 對每個 tool action 寫入 correlated attempt／result 至 `.council/audit/events.jsonl`；可用 `council audit show`／`export`（尚無 hash chain／secret redaction）
 - 專案政策檔：可選根目錄 `council.policy.yaml`（允許／拒絕指令 pattern、額外敏感路徑）；以 Pydantic 驗證（未知欄位目前會被忽略）
 - Tool 呼叫追蹤與 `max_tool_calls` 上限（預設 50）
 - Verification 可接收結構化 tool 執行摘要（含 pytest 結果）
 - 可選 `.council/` sandbox：session 紀錄（`meta.json` + `tools.jsonl`）與跨 session 審計（`audit/events.jsonl`）
 
-> **安全提示**：`run_command` 只接受下述受限 simple grammar，並使用 argv + `shell=False`；這是 command boundary 強化，**不是** OS／容器級 sandbox。`ConfirmMode`／`--yes` **不等於** Trust Tier。可用 `council.policy.yaml` 限縮規則，但政策檔位於 Agent 可寫的專案目錄。仍**不是**完整信任框架（尚無 Trust Tier、`council trust`、統一 Policy Middleware、principal、hash chain）。請僅在信任的專案目錄與可丟棄環境使用，並避免將不受信任的 prompt 直接餵給 Agent。v1.0 前清債與測試文件見 [docs/index.md](docs/index.md)、[ROADMAP.md](ROADMAP.md)。
+> **安全提示**：`run_command` 只接受下述受限 simple grammar，並使用 argv + `shell=False`；這是 command boundary 強化，**不是** OS／容器級 sandbox。v0.9.2 已建立唯一 tool dispatcher，但 `ConfirmMode`／`--yes` **不等於** Trust Tier。可用 `council.policy.yaml` 限縮規則，但政策檔位於 Agent 可寫的專案目錄。仍**不是**完整信任框架（尚無 Trust Tier、`council trust`、principal／scope、authentication、audit hash chain）。請僅在信任的專案目錄與可丟棄環境使用，並避免將不受信任的 prompt 直接餵給 Agent。v1.0 前清債與測試文件見 [docs/index.md](docs/index.md)、[ROADMAP.md](ROADMAP.md)。
 
 ## Presets
 
@@ -89,7 +90,26 @@ uv run council audit export ./audit-export.jsonl
 uv run council audit export ./audit-s1.jsonl --session <session-id>
 ```
 
-Workspace 解析順序：`--workspace` > `.council/config.yaml` > `COUNCIL_WORKSPACE_ROOT` > 目前工作目錄。未初始化 sandbox 時管線仍可執行（向後相容），只是不會寫入 session 檔與審計日誌。
+Workspace 解析順序：`--workspace` > `.council/config.yaml` > `COUNCIL_WORKSPACE_ROOT` > 目前工作目錄。未初始化 sandbox 時管線仍會建立 in-memory `SecurityContext`、執行同一 middleware 決策並產生 correlated tracker summaries，但不會建立 session 檔或 durable audit 日誌。
+
+### Policy Middleware 與 library tool API
+
+六個 public tools 與 Execution Crew adapters 都呼叫 `security.middleware.invoke()`。Dispatcher 固定處理 context 驗證、`max_tool_calls`、tool-specific workspace／policy／classification／confirmation、tracker、可選 session、可選 audit，再執行 operation。CrewAI wrapper 只轉接 typed input 與格式化 `ToolResult`，不再自行決定 tracker/session/audit。
+
+直接以 Python 呼叫 public tool 時，caller 必須明確建立並安裝一份 context：
+
+```python
+from council_agent.security import SecurityContext, security_context
+from council_agent.tools import read_file
+
+context = SecurityContext.create("/path/to/workspace")
+with security_context(context):
+    result = read_file("README.md")
+```
+
+`SecurityContext` 是單次 request snapshot，包含 request/session correlation、workspace guard、project policy snapshot、confirmation policy、tracker，以及可選 session/audit writer。目前 `policy_version="v0.9-unversioned"` 只是 context label，**不是** policy schema version；versioned schema 屬 v0.9.3。
+
+若未安裝 context、scope 已 cleanup、copied context 已 stale，public tool 會回傳 `ToolResult(success=False)` 與穩定的 `security_context_*` refusal，不會合成 compat context 或執行 operation。`tools/` 的 underscore helpers 是內部實作且不從 package export；它們不是支援的 product authorization entry。Python 同 process 的 hostile caller 仍可 introspect private objects，因此 middleware boundary 不是 in-process isolation。
 
 ### Shell simple grammar 與 containment
 
