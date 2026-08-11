@@ -33,7 +33,7 @@
 
 - [x] 5.1 Create `docs/releases/v0.9.6-session-auth-evidence.md` with threat model, bindings, denial/no-side-effect matrix, redaction evidence, test counts, and remaining limits.
 - [x] 5.2 Update v1.0 known issues, learning log, and v0.9.x handoff for V1-007 without version bump or Trust Tier/grant claims.
-- [ ] 5.3 Run `npx @fission-ai/openspec@latest validate --changes --strict`.
-- [ ] 5.4 Sync the security, sandbox, and orchestration deltas into main specs.
-- [ ] 5.5 Run `npx @fission-ai/openspec@latest validate --specs --strict`.
+- [x] 5.3 Run `npx @fission-ai/openspec@latest validate --changes --strict`.
+- [x] 5.4 Sync the security, sandbox, and orchestration deltas into main specs.
+- [x] 5.5 Run `npx @fission-ai/openspec@latest validate --specs --strict`.
 - [ ] 5.6 Run `./scripts/check.sh` before archive, archive `session-auth`, then run `./scripts/check.sh` again with no active change.
