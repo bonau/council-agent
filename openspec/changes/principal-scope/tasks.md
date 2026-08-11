@@ -20,13 +20,13 @@
 - [x] 3.2 Require `run_council` to receive a separate Council principal/current-authority source and install only principal data in `SecurityContext`.
 - [x] 3.3 Add strict Council-specific CLI principal identity/scope settings with a full-scope local compatibility default and update `.env.example`/README configuration guidance.
 - [x] 3.4 Add orchestration and CLI tests proving provider credentials do not authorize tools, principal data does not reach model credentials, unknown scopes fail before crews, and cleanup removes authority.
-- [ ] 3.5 Run `uv run pytest` and keep the full suite green before wrapper/end-to-end coverage.
+- [x] 3.5 Run `uv run pytest` and keep the full suite green before wrapper/end-to-end coverage.
 
 ## 4. Wrapper, composite, and end-to-end bypass coverage
 
-- [ ] 4.1 Add direct and CrewAI-wrapper matrix tests showing equivalent scope decisions and no second executable path.
-- [ ] 4.2 Add read-only and partial-scope `run_tests` tests proving no pytest process or mutation sentinel side effect and one top-level decision.
-- [ ] 4.3 Add shell read/write/dangerous scope-combination tests proving denial precedes process creation, project policy, and confirmation.
+- [x] 4.1 Add direct and CrewAI-wrapper matrix tests showing equivalent scope decisions and no second executable path.
+- [x] 4.2 Add read-only and partial-scope `run_tests` tests proving no pytest process or mutation sentinel side effect and one top-level decision.
+- [x] 4.3 Add shell read/write/dangerous scope-combination tests proving denial precedes process creation, project policy, and confirmation.
 - [ ] 4.4 Run `uv run pytest` with all unit, integration, security, and end-to-end tests green.
 
 ## 5. Documentation and release evidence

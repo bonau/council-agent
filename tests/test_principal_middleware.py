@@ -6,6 +6,9 @@ import json
 from pathlib import Path
 from unittest import mock
 
+import pytest
+
+from council_agent.crews.execution_tools import build_execution_tools
 from council_agent.security import (
     AuditLogger,
     ConfirmMode,
@@ -33,6 +36,10 @@ def _principal(
         issuer="pytest",
         scopes=frozenset(scopes),
     )
+
+
+def _crew_tools() -> dict[str, object]:
+    return {tool.name: tool for tool in build_execution_tools()}
 
 
 def test_context_without_principal_denies_and_audits_before_handler(
@@ -277,3 +284,160 @@ def test_authorization_metadata_is_json_serializable(tmp_path: Path) -> None:
     encoded = json.dumps(result.metadata["scope_authorization"], sort_keys=True)
     assert principal.principal_id not in encoded
     assert '"scope_decision": "allow"' in encoded
+
+
+def test_direct_and_wrapper_scope_denials_have_equivalent_evidence(
+    tmp_path: Path,
+) -> None:
+    audit_path = tmp_path / "audit" / "events.jsonl"
+    context = SecurityContext.create(
+        tmp_path,
+        principal=_principal(PrincipalScope.READ),
+        audit_logger=AuditLogger(audit_path),
+    )
+
+    with without_security_context(), security_context(context):
+        direct = write_file("direct.txt", "blocked")
+        wrapped = _crew_tools()["write_file"].run(
+            path="wrapped.txt",
+            content="blocked",
+        )
+
+    results = [
+        event
+        for event in load_audit_events(audit_path)
+        if event.phase == "result"
+    ]
+    assert direct.metadata["rejection_reason"] == "scope_insufficient"
+    assert wrapped.startswith("ERROR:")
+    assert len(results) == 2
+    assert all(
+        event.metadata["scope_authorization"]["reason"]
+        == "scope_insufficient"
+        for event in results
+    )
+    assert not (tmp_path / "direct.txt").exists()
+    assert not (tmp_path / "wrapped.txt").exists()
+    assert context.tracker.summaries == []
+
+
+@pytest.mark.parametrize(
+    ("scopes", "missing"),
+    [
+        ((PrincipalScope.READ,), ["filesystem:mutate", "test"]),
+        ((PrincipalScope.TEST,), ["filesystem:mutate"]),
+        ((PrincipalScope.FILESYSTEM_MUTATE,), ["test"]),
+    ],
+)
+def test_partial_scope_run_tests_is_one_side_effect_free_wrapper_denial(
+    tmp_path: Path,
+    scopes: tuple[PrincipalScope, ...],
+    missing: list[str],
+) -> None:
+    audit_path = tmp_path / "audit" / "events.jsonl"
+    context = SecurityContext.create(
+        tmp_path,
+        principal=_principal(*scopes),
+        audit_logger=AuditLogger(audit_path),
+    )
+    sentinel = tmp_path / "sentinel.txt"
+    sentinel.write_text("unchanged", encoding="utf-8")
+
+    with (
+        without_security_context(),
+        security_context(context),
+        mock.patch("council_agent.tools.shell.subprocess.run") as process,
+    ):
+        wrapped = _crew_tools()["run_tests"].run(path=".", args="")
+
+    events = load_audit_events(audit_path)
+    assert wrapped.startswith("ERROR:")
+    assert process.call_count == 0
+    assert sentinel.read_text(encoding="utf-8") == "unchanged"
+    assert context.tracker.summaries == []
+    assert [event.phase for event in events] == ["attempt", "result"]
+    assert events[-1].metadata["scope_authorization"]["missing_scopes"] == missing
+
+
+@pytest.mark.parametrize(
+    ("command", "scopes", "missing"),
+    [
+        (
+            "cat item.txt",
+            (PrincipalScope.READ,),
+            ["shell"],
+        ),
+        (
+            "cat item.txt",
+            (PrincipalScope.SHELL,),
+            ["read"],
+        ),
+        (
+            "mkdir marker",
+            (PrincipalScope.SHELL,),
+            ["filesystem:mutate"],
+        ),
+        (
+            "mkdir marker",
+            (PrincipalScope.FILESYSTEM_MUTATE,),
+            ["shell"],
+        ),
+        (
+            "rm -rf marker",
+            (
+                PrincipalScope.SHELL,
+                PrincipalScope.FILESYSTEM_MUTATE,
+            ),
+            ["high-risk:manage"],
+        ),
+        (
+            "rm -rf marker",
+            (
+                PrincipalScope.SHELL,
+                PrincipalScope.HIGH_RISK_MANAGE,
+            ),
+            ["filesystem:mutate"],
+        ),
+        (
+            "rm -rf marker",
+            (
+                PrincipalScope.FILESYSTEM_MUTATE,
+                PrincipalScope.HIGH_RISK_MANAGE,
+            ),
+            ["shell"],
+        ),
+    ],
+)
+def test_shell_scope_combinations_deny_before_lower_gates_and_process(
+    tmp_path: Path,
+    command: str,
+    scopes: tuple[PrincipalScope, ...],
+    missing: list[str],
+) -> None:
+    (tmp_path / "item.txt").write_text("content", encoding="utf-8")
+    marker = tmp_path / "marker"
+    marker.mkdir()
+    context = SecurityContext.create(
+        tmp_path,
+        principal=_principal(*scopes),
+        policy=CouncilPolicy(
+            schema_version=1,
+            allowed_commands=["cat *", "mkdir *", "rm *"],
+        ),
+        confirmation=ConfirmationPolicy(mode=ConfirmMode.AUTO),
+    )
+
+    with (
+        without_security_context(),
+        security_context(context),
+        mock.patch("council_agent.tools.shell._authorize_action") as lower_gate,
+        mock.patch("council_agent.tools.shell.subprocess.run") as process,
+    ):
+        result = run_command(command)
+
+    assert result.metadata["rejection_reason"] == "scope_insufficient"
+    assert result.metadata["scope_authorization"]["missing_scopes"] == missing
+    assert lower_gate.call_count == 0
+    assert process.call_count == 0
+    assert marker.is_dir()
+    assert (tmp_path / "item.txt").read_text(encoding="utf-8") == "content"
