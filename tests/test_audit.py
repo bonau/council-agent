@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import json
+import multiprocessing
+import os
 from pathlib import Path
 
 import pytest
@@ -28,6 +30,15 @@ from council_agent.security import (
     truncate_value,
     verify_audit_events,
 )
+
+
+def _append_audit_event_in_process(args: tuple[str, int]) -> int | None:
+    path, index = args
+    return AuditLogger(path).record(
+        "process-writer",
+        {"index": index},
+        success=True,
+    ).sequence
 
 
 def test_record_audit_event_noop_without_logger() -> None:
@@ -248,6 +259,24 @@ def test_versioned_events_have_contiguous_sequence_and_stable_ids(
     ]
     assert all(event.schema_version == AUDIT_SCHEMA_VERSION for event in loaded)
     assert all(event.event_id == compute_audit_event_id(event) for event in loaded)
+
+
+@pytest.mark.skipif(os.name != "posix", reason="uses POSIX cross-process lock")
+def test_process_writers_allocate_one_contiguous_sequence(tmp_path: Path) -> None:
+    path = tmp_path / "events.jsonl"
+    AuditLogger(path)
+    context = multiprocessing.get_context("spawn")
+
+    with context.Pool(processes=4) as pool:
+        sequences = pool.map(
+            _append_audit_event_in_process,
+            [(str(path), index) for index in range(12)],
+        )
+
+    events, report = load_audit_events_with_integrity(path)
+    assert sorted(sequences) == list(range(1, 13))
+    assert [event.sequence for event in events] == list(range(1, 13))
+    assert report.status == "verified"
 
 
 def test_attempt_result_exact_reference_is_verified(tmp_path: Path) -> None:

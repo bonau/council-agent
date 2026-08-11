@@ -14,7 +14,7 @@
 
 - [x] 3.1 Strengthen middleware so every durable result references its exact attempt event and session evidence receives the same request/action and attempt/result IDs.
 - [x] 3.2 Make audit show/export report `empty`, `verified`, or `legacy_unverified`, sanitize output, and fail explicitly without exporting invalid history.
-- [ ] 3.3 Add middleware and CLI integration tests for success/denial correlation, audit-attempt failure, secret-safe persistence/export, integrity status, and invalid-log refusal; run `uv run pytest tests/test_policy_middleware.py tests/test_policy_middleware_tools.py tests/test_cli_audit.py tests/test_sandbox_e2e.py`.
+- [x] 3.3 Add middleware and CLI integration tests for success/denial correlation, audit-attempt failure, secret-safe persistence/export, integrity status, and invalid-log refusal; run `uv run pytest tests/test_policy_middleware.py tests/test_policy_middleware_tools.py tests/test_cli_audit.py tests/test_sandbox_e2e.py`.
 
 ## 4. Evidence and handoff
 
