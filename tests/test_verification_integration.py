@@ -4,6 +4,7 @@ from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 from council_agent.config.presets import get_effective_max_tool_calls, get_preset_by_name
+from council_agent.crews.execution import run_execution
 from council_agent.crews.verification import _format_tool_summaries, run_verification
 from council_agent.tools import ToolCallTracker, run_tests
 from council_agent.types import (
@@ -94,3 +95,42 @@ def test_real_run_tests_via_tracker(workspace_root: Path) -> None:
 def test_preset_max_tool_calls_default() -> None:
     preset = get_preset_by_name(PRESETS_DIR, "glm-stack")
     assert get_effective_max_tool_calls(preset) == 50
+
+
+def test_run_execution_partitions_cumulative_tracker_by_attempt() -> None:
+    plan = PlanArtifact(raw="{}", steps=["work"], success_criteria=[], risks=[])
+    prior = ToolCallSummary(
+        tool="read_file",
+        success=True,
+        output="old",
+        error=None,
+        metadata={"pipeline_attempt_id": "attempt-1"},
+    )
+    current = ToolCallSummary(
+        tool="write_file",
+        success=True,
+        output="new",
+        error=None,
+        metadata={"pipeline_attempt_id": "attempt-2"},
+    )
+    tracker = ToolCallTracker(max_tool_calls=5)
+    tracker.summaries.append(prior)
+    crew = MagicMock()
+
+    def _kickoff(**_kwargs):
+        tracker.summaries.append(current)
+        return MagicMock(raw="updated")
+
+    crew.kickoff.side_effect = _kickoff
+
+    execution = run_execution(
+        crew,
+        "prompt",
+        plan,
+        tracker=tracker,
+        attempt_id="attempt-2",
+    )
+
+    assert tracker.summaries == [prior, current]
+    assert execution.tool_summaries == [current]
+    assert execution.attempt_id == "attempt-2"

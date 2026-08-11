@@ -10,15 +10,15 @@
 - [x] 2.1 Add a context-scoped non-authorizing `pipeline_attempt_id` binding and include it in dispatcher result/tracker metadata.
 - [x] 2.2 Include the same attempt ID in durable audit attempt/result metadata and sandbox session tool records without changing matrix precedence.
 - [x] 2.3 Add direct/Crew/sandbox tests proving result, tracker, session, and audit correlation agree and prior evidence remains append-only.
-- [ ] 2.4 Run `uv run pytest` and record the all-green phase result before framework integration.
+- [x] 2.4 Run `uv run pytest` and record the all-green phase result before framework integration.
 
 ## 3. Escalation and re-verification integration
 
-- [ ] 3.1 Partition initial execution and escalation summaries by tracker offsets while retaining one cumulative run-level tool limit.
-- [ ] 3.2 Mount existing dispatcher-backed Execution Crew tools on escalation.
-- [ ] 3.3 Replace the single escalation branch with a bounded retry loop that re-verifies every new execution against the original plan and retains every attempt.
-- [ ] 3.4 Make legacy final output/execution/verdict fields and new final attempt/stop reason select the same last attempt.
-- [ ] 3.5 Add integration tests for initial PASS, escalation PASS, repeated FAIL/retry exhaustion, zero retries, tool evidence retention, and final-attempt alignment.
+- [x] 3.1 Partition initial execution and escalation summaries by tracker offsets while retaining one cumulative run-level tool limit.
+- [x] 3.2 Mount existing dispatcher-backed Execution Crew tools on escalation.
+- [x] 3.3 Replace the single escalation branch with a bounded retry loop that re-verifies every new execution against the original plan and retains every attempt.
+- [x] 3.4 Make legacy final output/execution/verdict fields and new final attempt/stop reason select the same last attempt.
+- [x] 3.5 Add integration tests for initial PASS, escalation PASS, repeated FAIL/retry exhaustion, zero retries, tool evidence retention, and final-attempt alignment.
 - [ ] 3.6 Run `uv run pytest` and record the all-green phase result before documentation work.
 
 ## 4. End-to-end evidence and document correction

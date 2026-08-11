@@ -3,8 +3,12 @@
 from __future__ import annotations
 
 import pytest
+from unittest.mock import MagicMock, patch
 
-from council_agent.crews.verification import validate_required_evidence
+from council_agent.crews.verification import (
+    run_verification,
+    validate_required_evidence,
+)
 from council_agent.types import (
     AttemptKind,
     CouncilAttempt,
@@ -228,3 +232,24 @@ def test_text_only_plan_does_not_invent_tool_requirement() -> None:
         )
         == []
     )
+
+
+def test_model_pass_is_forced_to_fail_without_required_test_evidence() -> None:
+    crew = MagicMock()
+    crew.kickoff.return_value = MagicMock(
+        raw='{"status":"PASS","summary":"claimed","issues":[]}'
+    )
+    plan = _plan(steps=["run pytest"], criteria=["all tests pass"])
+    execution = ExecutionResult(
+        raw="tests are fine",
+        attempt_id="attempt-1",
+    )
+
+    with patch(
+        "council_agent.crews.verification.extract_json_block",
+        return_value={"status": "PASS", "summary": "claimed", "issues": []},
+    ):
+        verdict = run_verification(crew, "fix tests", plan, execution)
+
+    assert verdict.status is VerdictStatus.FAIL
+    assert "Required tool evidence is missing: run_tests" in verdict.issues
