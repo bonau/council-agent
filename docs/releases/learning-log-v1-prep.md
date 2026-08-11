@@ -647,7 +647,7 @@ alpha 才開始實作 Trust Tier 0/1/2 runtime；本紀錄中的 v0.9.x 工作�
 
 ### 2026-08-11 19:15 UTC — v0.9.6 session-auth implementation
 
-- 狀態：runtime、dispatcher、orchestrator／CLI與sandbox evidence regression通過；OpenSpec sync／archive與final gate待完成
+- 狀態：runtime、dispatcher、orchestrator／CLI、sandbox evidence與active-change gate通過；delta已sync/archive，post-archive gate待完成
 - 基準：branch `cursor/v096-session-auth-d691`、package v0.9.5、change `session-auth`
 - 原始邊界問題：
   - Session UUID、request ID與local principal declaration只做correlation／authorization，不能證明fresh user/service authentication。
@@ -673,10 +673,12 @@ alpha 才開始實作 Trust Tier 0/1/2 runtime；本紀錄中的 v0.9.x 工作�
   - Dispatcher targeted：46 passed；compatibility targeted 81 passed；full 449 passed。
   - Orchestrator／CLI targeted：29 passed；full 456 passed。
   - Full-story auth targeted：37 passed；current full regression 459 passed。
+  - Active-change `./scripts/check.sh`：459 passed；change 1/1、main specs 5/5 strict passed。
   - 詳細evidence：[`v0.9.6-session-auth-evidence.md`](v0.9.6-session-auth-evidence.md)。
 - 剩餘風險／延期責任：
   - Process-local manager不是workspace外 user-owned persistent verifier/grant/revoke store；v0.9.7負責ownership、atomic update與cross-restart revoke。
   - Authentication requirement不是Trust Tier matrix；v0.9.8定義precedence，runtime仍停止於v1.0-alpha。
   - Hostile in-process Python、host owner/root、project test code、OS/process/network isolation不在本版。
 - 文件影響：README、`.env.example`、known issues、v0.9.x handoff、security/sandbox/orchestration delta與本learning log；feature branch不bump package version。
-- 下一步：完成active-change gate、sync三份delta、archive與post-archive gate。
+- Archive：25/25 tasks complete；delta已同步；change移至`openspec/changes/archive/2026-08-11-session-auth/`。
+- 下一步：完成post-archive `./scripts/check.sh`並push final archive revision。

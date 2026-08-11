@@ -36,4 +36,4 @@
 - [x] 5.3 Run `npx @fission-ai/openspec@latest validate --changes --strict`.
 - [x] 5.4 Sync the security, sandbox, and orchestration deltas into main specs.
 - [x] 5.5 Run `npx @fission-ai/openspec@latest validate --specs --strict`.
-- [ ] 5.6 Run `./scripts/check.sh` before archive, archive `session-auth`, then run `./scripts/check.sh` again with no active change.
+- [x] 5.6 Run `./scripts/check.sh` before archive, archive `session-auth`, then run `./scripts/check.sh` again with no active change.
