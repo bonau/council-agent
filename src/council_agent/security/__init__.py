@@ -19,8 +19,12 @@ from council_agent.security.audit import (
 )
 from council_agent.security.classifier import (
     ClassificationResult,
+    CommandAnalysis,
     CommandCategory,
+    CommandRejectionReason,
+    RejectedCommandAnalysis,
     classify_command,
+    contains_shell_control,
 )
 from council_agent.security.confirm import (
     ActionKind,
@@ -60,7 +64,9 @@ __all__ = [
     "AuditLogger",
     "AuditRecord",
     "ClassificationResult",
+    "CommandAnalysis",
     "CommandCategory",
+    "CommandRejectionReason",
     "ConfirmFn",
     "ConfirmMode",
     "ConfirmationOutcome",
@@ -74,10 +80,12 @@ __all__ = [
     "PolicyCommandReason",
     "PolicyError",
     "PolicyValidationError",
+    "RejectedCommandAnalysis",
     "TRUNCATION_MARKER",
     "active_policy",
     "audit_logger_context",
     "classify_command",
+    "contains_shell_control",
     "confirmation_policy",
     "default_audit_events_path",
     "default_confirm_fn",

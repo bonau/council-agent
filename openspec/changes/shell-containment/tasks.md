@@ -1,11 +1,11 @@
 ## 1. Pure command analysis, classifier, and parsers
 
-- [ ] 1.1 Add typed accepted/rejected command-analysis results with canonical argv, explicit `matched_rule`, and stable `unsupported`／`unparseable`／`shell_metachar` rejection reasons; remove the unknown-to-`read` fallback.
-- [ ] 1.2 Implement raw shell-control detection plus one-time `shlex.split(..., posix=True)` parsing for the supported simple-command grammar, including empty/NUL and malformed-quote refusal.
-- [ ] 1.3 Replace broad raw-string matching with an explicit supported-command registry and category precedence; keep shell interpreters unsupported and make multipurpose executables dangerous or unsupported rather than implicitly read.
-- [ ] 1.4 Implement pure per-command option/path-operand adapters for at least `cat`, `ls`, `rm`, `mv`, `cp`, `touch`, and `mkdir`, including `--`, multi-source/destination arity, recursive/force `rm` escalation, and unsupported ambiguous option forms.
-- [ ] 1.5 Implement the pure `run_tests` args parser/schema so balanced quoted values preserve token boundaries while shell control syntax, malformed quoting, unknown options, and unmodeled path-writing options fail closed.
-- [ ] 1.6 Add table-driven unit tests for accepted argv/category/rule results, unknown commands, all metacharacter forms, command substitution, unbalanced quoting, dangerous precedence, command operand extraction, and pytest args parsing.
+- [x] 1.1 Add typed accepted/rejected command-analysis results with canonical argv, explicit `matched_rule`, and stable `unsupported`／`unparseable`／`shell_metachar` rejection reasons; remove the unknown-to-`read` fallback.
+- [x] 1.2 Implement raw shell-control detection plus one-time `shlex.split(..., posix=True)` parsing for the supported simple-command grammar, including empty/NUL and malformed-quote refusal.
+- [x] 1.3 Replace broad raw-string matching with an explicit supported-command registry and category precedence; keep shell interpreters unsupported and make multipurpose executables dangerous or unsupported rather than implicitly read.
+- [x] 1.4 Implement pure per-command option/path-operand adapters for at least `cat`, `ls`, `rm`, `mv`, `cp`, `touch`, and `mkdir`, including `--`, multi-source/destination arity, recursive/force `rm` escalation, and unsupported ambiguous option forms.
+- [x] 1.5 Implement the pure `run_tests` args parser/schema so balanced quoted values preserve token boundaries while shell control syntax, malformed quoting, unknown options, and unmodeled path-writing options fail closed.
+- [x] 1.6 Add table-driven unit tests for accepted argv/category/rule results, unknown commands, all metacharacter forms, command substitution, unbalanced quoting, dangerous precedence, command operand extraction, and pytest args parsing.
 - [ ] 1.7 Run `uv run pytest` and keep the full existing suite green before beginning shell-tool wiring.
 
 ## 2. `run_command`／`run_tests` wiring and integration tests
