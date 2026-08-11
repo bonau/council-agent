@@ -809,4 +809,13 @@ alpha 才開始實作 Trust Tier 0/1/2 runtime；本紀錄中的 v0.9.x 工作�
   - Non-goals固定為OS containment、hostile project code、external audit anchor、runtime grant consumption與Trust Tier 0/1/2。
   - 獨立真人與無前置脈絡Agent走手冊仍是alpha admission gate；本feature不虛構外部執行證據。
 - Evidence：[`v0.9.9-evidence-closure-evidence.md`](v0.9.9-evidence-closure-evidence.md)。
+- Archive：orchestration／release-prep／sandbox／security delta已sync；change移至`openspec/changes/archive/2026-08-11-evidence-closure/`。
 - 下一步：完成sync/archive/post-archive gate後停止本序列；不得在此branch開Trust Tier runtime或bump version。
+
+### 2026-08-11 20:00 UTC — v0.9.9 tagged；清債序列結束
+
+- 狀態：通過（停止於 v1.0-alpha 前）
+- 基準：tag `v0.9.9`
+- 驗證：568 passed；`./scripts/check.sh` 全綠
+- 決策：不開 Trust Tier runtime；留給後續 Agent 依 playbook alpha 准入條件啟動
+- 下一步（其他 Agent）：確認 known-issues P0／P1 全關 → 開 `trust-framework` change（v1.0-alpha）
