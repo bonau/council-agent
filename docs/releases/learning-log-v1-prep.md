@@ -737,3 +737,39 @@ alpha 才開始實作 Trust Tier 0/1/2 runtime；本紀錄中的 v0.9.x 工作�
 - 基準：tag `v0.9.7`
 - 驗證：498 passed
 - 下一步：v0.9.8 trust-decision-matrix
+
+### 2026-08-11 19:40 UTC — v0.9.8 trust-decision-matrix implementation
+
+- 狀態：純矩陣、dispatcher evidence、CLI／Crew／library parity與文件完成；等待OpenSpec sync/archive及final gates
+- 基準：branch `cursor/v098-trust-decision-matrix-d691`、tag `v0.9.7`、package metadata不bump、change `trust-decision-matrix`
+- 原始邊界問題（V1-009／SEC-P0-005）：
+  - `ConfirmMode.AUTO`／`--yes`表示如何回覆互動，卻缺少單一合成契約，容易被後續Tier runtime誤當principal、scope、authentication或grant。
+  - Scope/auth/grant各有stable local decision，但CLI、Crew、library沒有一份共同六維vector、完整precedence或頂層reason。
+- 核准矩陣：
+  - Integer schema version固定`1`；輸入固定policy、principal/scope、authentication、grant、action risk、interaction六維；輸出只可`deny`／`require_confirmation`／`allow`。
+  - Precedence固定policy→scope→authentication→grant→risk→interaction。Policy deny／failed allowlist先於scope；scope各missing/revoked/invalid/mismatch/insufficient先於authentication；authentication denial先於grant；invalid/missing/revoked/expired/insufficient grant先於risk/interaction。
+  - Risk=`read`不需interaction；`mutate`／`high_risk`在authority全通過後才看`pending`／`auto`／`approved`／`denied`／`refused`／`compat_allow`。Pending回`confirmation_required`，AUTO/approved/compat回`decision_allowed`。
+  - Reason codes使用closed enum並沿用既有`principal_*`、`scope_insufficient`、`authentication_*`、`trust_*`；新增頂層`policy_denied`、`policy_not_allowed`、`action_risk_unrecognized`、`confirmation_*`、`decision_allowed`。Unknown string不採用。
+- Runtime／evidence：
+  - Mandatory `security.middleware.invoke()`把既有scope/auth、command policy、canonical risk與handler-resolved interaction映射成`metadata.trust_decision={matrix_version,outcome,reason,vector}`；tracker、session及result audit沿用同一object。Crew wrapper只格式化，CLI只解析context。
+  - 普通operation failure可`ToolResult.success=False`但matrix=`allow`，因為authority已通過；tool limit／audit／execution error保留outer reason，不假裝是authorization。
+  - v0.9.8 product grant state固定`trust_grant_not_required`，測試patch `TrustGrantStore.lookup` call count=0。Matching persisted grant仍不改dispatcher decision。
+- `ConfirmMode`相容／遷移：
+  - `ask`仍prompt且default No、`auto`仍不prompt、`refuse`仍拒絕、`compat`仍allow mutate/refuse high risk；這些只在authority通過後影響當次interaction，不persist grant/token。
+  - `--yes`仍解析為AUTO供CI相容；help改成明示只skip interaction prompts，不grant scopes、authenticate、create trust grant或elevate privilege。Non-TTY無`--yes`仍為REFUSE。
+- 旁路／無副作用：
+  - AUTO+scope不足拒絕且file absent；policy deny+scope不足回policy reason且no process；high-risk缺authentication+AUTO回`authentication_missing`且marker保留；invalid grant+AUTO在純矩陣仍deny。
+  - Direct與Crew相同write vector在兩筆result audit有完全相同matrix object，兩者皆不執行handler；CLI-resolved AUTO vector結果一致。
+  - `council run --trust-tier 2`解析失敗，help無該option；沒有Tier enum/context state。
+- 漸進驗證：
+  - Pure matrix focused 44 passed；phase-1 full 542 passed。
+  - Pure+dispatcher focused 51 passed；phase-2 full 549 passed。
+  - All v0.9.8 suites focused 55 passed；phase-3 full 553 passed。
+  - Active/post-archive `./scripts/check.sh`與archive path待final gate後回填。
+  - 詳細evidence：[`v0.9.8-trust-decision-matrix-evidence.md`](v0.9.8-trust-decision-matrix-evidence.md)。
+- 剩餘風險／v1.0-alpha接線：
+  - Tier runtime須另加typed Tier 0/1/2 source與tier→grant/interaction translator，顯式exact grant lookup，再把closed result傳入vector；不得改policy/scope/auth/invalid-grant precedence。
+  - `--trust-tier`只能在該change連同authentication、audit、migration與e2e證據新增。任何state/precedence修改必須version matrix。
+  - 本版不提供hostile in-process、OS/process/network isolation、remote IAM或externally anchored hash chain。
+- 文件影響：known issues關閉V1-009／SEC-P0-005的matrix scope、handoff進入v0.9.8、security/tools/orchestration delta與本learning log；feature branch不bump version。
+- 下一步：sync三份delta、strict validate、active gate、archive、post-archive gate；之後只接v0.9.9 `evidence-closure`，不得開Trust Tier runtime。
