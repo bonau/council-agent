@@ -295,4 +295,3 @@ def test_existing_orchestrator_api_still_works_without_kwargs(
     assert result.final_output == "ok"
     assert "tracker" not in mock_exec_build.call_args.kwargs
     assert "session" not in mock_exec_build.call_args.kwargs
-    assert mock_exec_build.call_args.kwargs["session"] is None
