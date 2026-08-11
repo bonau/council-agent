@@ -599,3 +599,41 @@ alpha 才開始實作 Trust Tier 0/1/2 runtime；本紀錄中的 v0.9.x 工作�
 - 基準：tag `v0.9.4`
 - 驗證：375 passed
 - 下一步：v0.9.5 principal-scope
+
+### 2026-08-11 18:29 UTC — v0.9.5 principal-scope implementation
+
+- 狀態：runtime、dispatcher、wrapper/composite與full regression通過；OpenSpec sync／archive與final gate待完成
+- 基準：branch `cursor/v095-principal-scope-d691`、package v0.9.4、change `principal-scope`
+- 原始邊界問題：
+  - `OPENROUTER_API_KEY`以raw string一路傳給crew/model builder，容易被誤當成「持有key即可授權local tools」；request/session UUID也沒有stable caller authority語意。
+  - `SecurityContext`沒有principal或scope。Project policy與confirmation只能限制action，不能回答caller是否有read／mutate／test／shell／high-risk authority。
+  - `run_tests`是一個會執行project code的composite action；若只看tool名稱或read-only宣稱，可能成為間接mutation path。
+- 決策：
+  - Provider path改為Pydantic `SecretStr` → redacted `OpenRouterCredential` → model builder；Council path獨立為immutable `Principal(principal_id, kind, issuer, scopes)`。`run_council`顯式需要兩者，型別交叉在crews前拒絕。
+  - Closed scopes為`read`、`filesystem:mutate`、`test`、`shell`、`high-risk:manage`。要求採cumulative matrix：tests需test+mutate；shell read/write/dangerous除shell外分別累加read／mutate／mutate+high-risk。
+  - `SecurityContext`固定expected issuer/kind/ID但每action呼叫current resolver。Current scope縮小在下一次decision生效；`None`為`principal_revoked`；替換identity為`principal_mismatch`。Resolver是integration seam，不是grant store。
+  - Scope gate位於handler前；project policy、confirmation、`--yes`與Crew wrapper只能在既有authority內進一步限制，不能補scope。
+  - Evidence使用`metadata.scope_authorization`，而非sanitizer保留給HTTP secret的generic `authorization` key。內容只有masked `sha256:` ref、kind、required/granted/missing scopes、decision/reason；沿用audit schema-v1 top-level envelope。
+- Default與相容性：
+  - CLI依local OS user建立stable local-user principal；預設五種scope以保留既有CLI能力，可由`COUNCIL_PRINCIPAL_ID`／`COUNCIL_PRINCIPAL_SCOPES`顯式固定／縮權。
+  - Unknown scope在pipeline前以不回顯輸入值的diagnostic拒絕。CLI只顯示masked ref；`--yes` help明列不授scope、不authenticate。
+  - Library migration需要`OpenRouterCredential`與`Principal`兩個必要參數；direct tool context也必須帶principal才可執行。
+- 旁路／無副作用證據：
+  - Read-only direct/write與Crew wrapper同為`scope_insufficient`，target不存在或sentinel不變，tracker沒有executed action。
+  - Read-only、test-only與mutate-only wrapper `run_tests`均只有一組top-level attempt/result，subprocess call count 0，無nested `run_command`。
+  - Shell read/write/dangerous七種缺scope組合在policy/confirmation helper前拒絕，subprocess call count 0，read/mutation sentinels不變。
+  - Full → read-only → revoked resolver sequence只有第一次write生效，下一個write/read立即拒絕。
+  - Audit raw JSONL不含credential-shaped principal ID或provider value；attempt/result masked ref相同且exact correlation保留。
+- 漸進驗證：
+  - Principal/credential core：22 targeted、397 full passed。
+  - Dispatcher/product path：51 targeted、405 full passed。
+  - Orchestration/provider boundary：61 targeted、411 full passed。
+  - Wrapper/composite/shell bypass：19 targeted、422 full passed。
+  - 詳細evidence：[`v0.9.5-principal-scope-evidence.md`](v0.9.5-principal-scope-evidence.md)。
+- 剩餘風險／延期責任：
+  - Local principal declaration、session UUID與`--yes`都不是authentication；challenge、expiry/replay與step-up屬v0.9.6。
+  - Current resolver不是workspace外、user-owned、atomic/revocable grant store；persistent grants/revoke屬v0.9.7。
+  - ConfirmMode與scope尚未形成完整Trust Tier decision matrix；v0.9.8只定義matrix，runtime仍停止於v1.0-alpha。
+  - Product scope boundary不提供hostile in-process Python、OS/process/network或host owner/root隔離。
+- 文件影響：README、`.env.example`、known issues、v0.9.x handoff、security/tools/orchestration delta與本learning log；feature branch不bump package version。
+- 下一步：sync三份delta、strict validate、active-change check、archive與post-archive check；後續唯一主要問題是v0.9.6 `session-auth`。

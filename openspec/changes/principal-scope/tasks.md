@@ -27,13 +27,13 @@
 - [x] 4.1 Add direct and CrewAI-wrapper matrix tests showing equivalent scope decisions and no second executable path.
 - [x] 4.2 Add read-only and partial-scope `run_tests` tests proving no pytest process or mutation sentinel side effect and one top-level decision.
 - [x] 4.3 Add shell read/write/dangerous scope-combination tests proving denial precedes process creation, project policy, and confirmation.
-- [ ] 4.4 Run `uv run pytest` with all unit, integration, security, and end-to-end tests green.
+- [x] 4.4 Run `uv run pytest` with all unit, integration, security, and end-to-end tests green.
 
 ## 5. Documentation and release evidence
 
-- [ ] 5.1 Create `docs/releases/v0.9.5-principal-scope-evidence.md` with scope matrix, provider/principal flow, positive/refusal/bypass/no-side-effect/audit evidence, test counts, and limitations.
-- [ ] 5.2 Close V1-006 in `docs/releases/v1.0-alpha-known-issues.md` while retaining v0.9.6 authentication, v0.9.7 grants, and Trust Tier as open boundaries.
-- [ ] 5.3 Append v0.9.5 decisions/results to `docs/releases/learning-log-v1-prep.md` and update `docs/releases/v0.9.x-handoff.md` status/next-version guidance.
+- [x] 5.1 Create `docs/releases/v0.9.5-principal-scope-evidence.md` with scope matrix, provider/principal flow, positive/refusal/bypass/no-side-effect/audit evidence, test counts, and limitations.
+- [x] 5.2 Close V1-006 in `docs/releases/v1.0-alpha-known-issues.md` while retaining v0.9.6 authentication, v0.9.7 grants, and Trust Tier as open boundaries.
+- [x] 5.3 Append v0.9.5 decisions/results to `docs/releases/learning-log-v1-prep.md` and update `docs/releases/v0.9.x-handoff.md` status/next-version guidance.
 
 ## 6. Verification, synchronization, and archive
 
