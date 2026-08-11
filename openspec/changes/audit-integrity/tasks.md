@@ -18,8 +18,8 @@
 
 ## 4. Evidence and handoff
 
-- [ ] 4.1 Create `docs/releases/v0.9.4-audit-integrity-evidence.md` with threat boundary, redaction matrix, sequence/correlation/tamper evidence, migration behavior, test counts, and deferred hash-chain risks.
-- [ ] 4.2 Update `docs/releases/v1.0-alpha-known-issues.md`, `docs/releases/learning-log-v1-prep.md`, and `docs/releases/v0.9.x-handoff.md` for v0.9.4 closure and v0.9.5 ownership without a version bump.
+- [x] 4.1 Create `docs/releases/v0.9.4-audit-integrity-evidence.md` with threat boundary, redaction matrix, sequence/correlation/tamper evidence, migration behavior, test counts, and deferred hash-chain risks.
+- [x] 4.2 Update `docs/releases/v1.0-alpha-known-issues.md`, `docs/releases/learning-log-v1-prep.md`, and `docs/releases/v0.9.x-handoff.md` for v0.9.4 closure and v0.9.5 ownership without a version bump.
 
 ## 5. Verification and specification sync
 
