@@ -25,8 +25,19 @@ from council_agent.security.middleware import (
     security_context,
     without_security_context,
 )
+from council_agent.security.principal import full_scope_principal
 from council_agent.tools.base import ToolResult
 from council_agent.tools.tracker import ToolCallTracker
+
+TEST_PRINCIPAL = full_scope_principal("policy-middleware-tests", issuer="pytest")
+
+
+def _security_context(*args: object, **kwargs: object) -> SecurityContext:
+    return SecurityContext.create(
+        *args,
+        principal=TEST_PRINCIPAL,
+        **kwargs,
+    )
 
 
 @pytest.fixture(autouse=True)
@@ -63,7 +74,7 @@ def test_context_tracks_and_correlates_success(
     registered_read_handler: None,
 ) -> None:
     tracker = ToolCallTracker(max_tool_calls=2)
-    context = SecurityContext.create(
+    context = _security_context(
         tmp_path,
         request_id="request-1",
         tracker=tracker,
@@ -86,7 +97,7 @@ def test_context_cleanup_and_copied_context_fail_closed(
     tmp_path: Path,
     registered_read_handler: None,
 ) -> None:
-    context = SecurityContext.create(tmp_path)
+    context = _security_context(tmp_path)
 
     with security_context(context):
         copied = contextvars.copy_context()
@@ -100,7 +111,7 @@ def test_context_cleanup_and_copied_context_fail_closed(
 
 
 def test_closed_context_cannot_be_reinstalled(tmp_path: Path) -> None:
-    context = SecurityContext.create(tmp_path)
+    context = _security_context(tmp_path)
     with security_context(context):
         pass
 
@@ -124,14 +135,14 @@ def test_session_workspace_mismatch_is_rejected(tmp_path: Path) -> None:
     )
 
     with pytest.raises(SecurityContextError, match="workspace"):
-        SecurityContext.create(tmp_path, session=session)
+        _security_context(tmp_path, session=session)
 
 
 def test_audit_session_mismatch_is_rejected(tmp_path: Path) -> None:
     logger = AuditLogger(tmp_path / "events.jsonl", session_id="audit-session")
 
     with pytest.raises(SecurityContextError, match="audit identity"):
-        SecurityContext.create(
+        _security_context(
             tmp_path,
             session_id="context-session",
             audit_logger=logger,
@@ -139,8 +150,8 @@ def test_audit_session_mismatch_is_rejected(tmp_path: Path) -> None:
 
 
 def test_context_derives_policy_version_from_snapshot(tmp_path: Path) -> None:
-    builtin = SecurityContext.create(tmp_path)
-    project = SecurityContext.create(
+    builtin = _security_context(tmp_path)
+    project = _security_context(
         tmp_path,
         policy=CouncilPolicy(
             schema_version=1,
@@ -154,7 +165,7 @@ def test_context_derives_policy_version_from_snapshot(tmp_path: Path) -> None:
 
 def test_context_rejects_mismatched_policy_version(tmp_path: Path) -> None:
     context = replace(
-        SecurityContext.create(tmp_path),
+        _security_context(tmp_path),
         policy_version=POLICY_VERSION_UNVERSIONED,
     )
 
@@ -163,7 +174,7 @@ def test_context_rejects_mismatched_policy_version(tmp_path: Path) -> None:
 
 
 def test_legacy_policy_view_updates_snapshot_version(tmp_path: Path) -> None:
-    context = SecurityContext.create(tmp_path)
+    context = _security_context(tmp_path)
     policy = CouncilPolicy(schema_version=1, denied_paths=["secrets/**"])
 
     with security_context(context):
@@ -182,7 +193,7 @@ def test_legacy_policy_view_updates_snapshot_version(tmp_path: Path) -> None:
 def test_unknown_tool_is_denied_and_audited(tmp_path: Path) -> None:
     audit_path = tmp_path / "audit" / "events.jsonl"
     logger = AuditLogger(audit_path)
-    context = SecurityContext.create(
+    context = _security_context(
         tmp_path,
         request_id="request-unknown",
         audit_logger=logger,
@@ -213,7 +224,7 @@ def test_limit_denial_does_not_call_or_track_handler(
     monkeypatch.setitem(_TOOL_HANDLERS, "read_file", handler)
     audit_path = tmp_path / "events.jsonl"
     tracker = ToolCallTracker(max_tool_calls=0)
-    context = SecurityContext.create(
+    context = _security_context(
         tmp_path,
         tracker=tracker,
         audit_logger=AuditLogger(audit_path),
@@ -239,7 +250,7 @@ def test_success_emits_correlated_attempt_and_result(
     registered_read_handler: None,
 ) -> None:
     audit_path = tmp_path / "events.jsonl"
-    context = SecurityContext.create(
+    context = _security_context(
         tmp_path,
         request_id="request-audit",
         audit_logger=AuditLogger(audit_path),
@@ -295,7 +306,7 @@ def test_handler_exception_becomes_tracked_audited_failure(
     monkeypatch.setitem(_TOOL_HANDLERS, "read_file", broken)
     audit_path = tmp_path / "events.jsonl"
     tracker = ToolCallTracker(max_tool_calls=1)
-    context = SecurityContext.create(
+    context = _security_context(
         tmp_path,
         tracker=tracker,
         audit_logger=AuditLogger(audit_path),
@@ -331,7 +342,7 @@ def test_session_receives_one_correlated_result(
         ),
     )
     session.tools_path.write_text("", encoding="utf-8")
-    context = SecurityContext.create(tmp_path, session=session)
+    context = _security_context(tmp_path, session=session)
 
     with security_context(context):
         result = invoke("read_file")
@@ -373,7 +384,7 @@ def test_session_links_exact_audit_events_and_redacts_all_result_fields(
     )
     session.tools_path.write_text("", encoding="utf-8")
     audit_path = tmp_path / "audit" / "events.jsonl"
-    context = SecurityContext.create(
+    context = _security_context(
         tmp_path,
         request_id="request-secret",
         session=session,
@@ -419,7 +430,7 @@ def test_audit_attempt_failure_denies_before_handler_without_secret_echo(
             RuntimeError("api_key=must-not-echo")
         ),
     )
-    context = SecurityContext.create(tmp_path, audit_logger=logger)
+    context = _security_context(tmp_path, audit_logger=logger)
 
     with security_context(context):
         result = invoke("read_file", path="a.txt")

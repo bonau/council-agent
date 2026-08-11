@@ -14,6 +14,7 @@ from council_agent.security import (
     AuditLogger,
     SecurityContext,
     default_audit_events_path,
+    full_scope_principal,
     get_security_context,
     load_audit_events,
     security_context,
@@ -106,7 +107,11 @@ def test_wrapper_without_context_fails_closed(workspace_root: Path) -> None:
 
 def test_tracker_limit_blocks_underlying_call(workspace_root: Path) -> None:
     tracker = ToolCallTracker(max_tool_calls=1)
-    context = SecurityContext.create(workspace_root, tracker=tracker)
+    context = SecurityContext.create(
+        workspace_root,
+        tracker=tracker,
+        principal=full_scope_principal("crew-limit-test", issuer="pytest"),
+    )
     with without_security_context(), security_context(context):
         tools = _tools_by_name()
         tools["write_file"].run(path="a.txt", content="one")
@@ -131,6 +136,7 @@ def test_wrapper_appends_to_session(workspace_root: Path) -> None:
         workspace_root,
         tracker=tracker,
         session=session,
+        principal=full_scope_principal("crew-session-test", issuer="pytest"),
     )
     with without_security_context(), security_context(context):
         tools = _tools_by_name()
@@ -157,6 +163,7 @@ def test_wrapper_appends_to_audit_when_logger_installed(workspace_root: Path) ->
         tracker=tracker,
         session=session,
         audit_logger=logger,
+        principal=full_scope_principal("crew-audit-test", issuer="pytest"),
     )
     with without_security_context(), security_context(context):
         tools = _tools_by_name()

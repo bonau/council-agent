@@ -15,7 +15,7 @@ from council_agent.orchestrator import run_council
 from council_agent.sandbox.config import apply_workspace_root, init_sandbox
 from council_agent.sandbox.session import SessionManager
 from council_agent.sandbox.workspace import get_workspace_guard
-from council_agent.security import without_security_context
+from council_agent.security import full_scope_principal, without_security_context
 from council_agent.types import (
     PlanArtifact,
     VerdictStatus,
@@ -23,6 +23,7 @@ from council_agent.types import (
 )
 
 PRESETS_DIR = Path(__file__).resolve().parents[1] / "presets"
+TEST_PRINCIPAL = full_scope_principal("sandbox-e2e", issuer="pytest")
 
 
 @pytest.fixture(autouse=True)
@@ -100,6 +101,7 @@ def test_e2e_run_with_sandbox_writes_files_and_session(
             preset,
             "test-key",
             project_root=tmp_path,
+            principal=TEST_PRINCIPAL,
         )
 
     assert (tmp_path / "hello.txt").read_text(encoding="utf-8") == "from-e2e"
@@ -184,6 +186,7 @@ def test_e2e_run_with_sandbox_writes_audit_events(
             preset,
             "test-key",
             project_root=tmp_path,
+            principal=TEST_PRINCIPAL,
         )
 
     assert get_audit_logger() is None
@@ -244,7 +247,12 @@ def test_e2e_run_without_sandbox_skips_session_files(
             return_value=verdict,
         ),
     ):
-        result = run_council("no sandbox", preset, "test-key")
+        result = run_council(
+            "no sandbox",
+            preset,
+            "test-key",
+            principal=TEST_PRINCIPAL,
+        )
 
     assert (tmp_path / "hello.txt").exists()
     assert len(result.execution.tool_summaries) == 3

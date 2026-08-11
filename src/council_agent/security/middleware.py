@@ -18,6 +18,14 @@ from council_agent.security.policy import (
     CURRENT_POLICY_SCHEMA_VERSION,
     CouncilPolicy,
 )
+from council_agent.security.principal import (
+    AuthorizationReason,
+    Principal,
+    PrincipalResolver,
+    ScopeDecision,
+    evaluate_principal_scopes,
+    required_scopes_for_action,
+)
 from council_agent.tools.base import ToolResult, _err
 from council_agent.tools.tracker import ToolCallTracker
 
@@ -104,6 +112,12 @@ class SecurityContext:
     policy: CouncilPolicy | None
     confirmation: ConfirmationPolicy
     tracker: ToolCallTracker
+    principal: Principal | None = None
+    principal_resolver: PrincipalResolver | None = field(
+        default=None,
+        repr=False,
+        compare=False,
+    )
     session_id: str | None = None
     session: SessionManager | None = None
     audit_logger: AuditLogger | None = None
@@ -124,6 +138,8 @@ class SecurityContext:
         policy: CouncilPolicy | None = None,
         confirmation: ConfirmationPolicy | None = None,
         tracker: ToolCallTracker | None = None,
+        principal: Principal | None = None,
+        principal_resolver: PrincipalResolver | None = None,
         session: SessionManager | None = None,
         audit_logger: AuditLogger | None = None,
     ) -> SecurityContext:
@@ -141,6 +157,8 @@ class SecurityContext:
             policy=policy,
             confirmation=confirmation or ConfirmationPolicy(),
             tracker=tracker if tracker is not None else ToolCallTracker(),
+            principal=principal,
+            principal_resolver=principal_resolver,
             session_id=resolved_session_id,
             session=session,
             audit_logger=audit_logger,
@@ -173,6 +191,30 @@ class SecurityContext:
                 "Security context tracker is invalid",
                 SecurityContextReason.INVALID,
             )
+        if self.principal is not None:
+            if not isinstance(self.principal, Principal):
+                raise SecurityContextError(
+                    "Security context principal is invalid",
+                    SecurityContextReason.INVALID,
+                )
+            try:
+                self.principal.__post_init__()
+            except ValueError as exc:
+                raise SecurityContextError(
+                    "Security context principal is invalid",
+                    SecurityContextReason.INVALID,
+                ) from exc
+        if self.principal_resolver is not None:
+            if not callable(self.principal_resolver):
+                raise SecurityContextError(
+                    "Security context principal resolver is invalid",
+                    SecurityContextReason.INVALID,
+                )
+            if self.principal is None:
+                raise SecurityContextError(
+                    "Security context principal resolver requires a bound principal",
+                    SecurityContextReason.INVALID,
+                )
         if self.session is not None:
             session_workspace = Path(self.session.meta.workspace_root).resolve()
             if session_workspace != self.workspace.root:
@@ -338,6 +380,7 @@ def _correlation_metadata(
     context: SecurityContext,
     action_id: str,
     decision: str,
+    authorization: ScopeDecision | None = None,
 ) -> dict[str, Any]:
     metadata: dict[str, Any] = {
         "request_id": context.request_id,
@@ -345,6 +388,8 @@ def _correlation_metadata(
         "decision": decision,
         "policy_version": context.policy_version,
     }
+    if authorization is not None:
+        metadata["authorization"] = authorization.to_metadata()
     if context.session_id is not None:
         metadata["session_id"] = context.session_id
     return metadata
@@ -355,6 +400,7 @@ def _with_correlation(
     context: SecurityContext,
     action_id: str,
     decision: str,
+    authorization: ScopeDecision | None = None,
 ) -> ToolResult:
     return ToolResult(
         success=result.success,
@@ -362,7 +408,12 @@ def _with_correlation(
         error=result.error,
         metadata={
             **result.metadata,
-            **_correlation_metadata(context, action_id, decision),
+            **_correlation_metadata(
+                context,
+                action_id,
+                decision,
+                authorization,
+            ),
         },
     )
 
@@ -390,6 +441,7 @@ def _audit(
     decision: str | None,
     result: ToolResult | None = None,
     attempt_event_id: str | None = None,
+    authorization: ScopeDecision | None = None,
 ) -> AuditRecord | None:
     logger = context.audit_logger
     if logger is None:
@@ -399,7 +451,13 @@ def _audit(
         args,
         success=None if result is None else result.success,
         error=None if result is None else result.error,
-        metadata={} if result is None else result.metadata,
+        metadata=(
+            {"authorization": authorization.to_metadata()}
+            if result is None and authorization is not None
+            else {}
+            if result is None
+            else result.metadata
+        ),
         session_id=context.session_id,
         phase=phase,
         request_id=context.request_id,
@@ -417,6 +475,7 @@ def _result_evidence(
     action_id: str,
     result: ToolResult,
     attempt: AuditRecord | None,
+    authorization: ScopeDecision,
 ) -> AuditRecord | None:
     completed = _audit(
         context,
@@ -427,6 +486,7 @@ def _result_evidence(
         decision=result.metadata["decision"],
         result=result,
         attempt_event_id=None if attempt is None else attempt.event_id,
+        authorization=authorization,
     )
     if context.session is not None:
         context.session.append_tool_call(
@@ -454,6 +514,7 @@ def _finalize_evidence(
     action_id: str,
     result: ToolResult,
     attempt: AuditRecord | None,
+    authorization: ScopeDecision,
 ) -> ToolResult:
     try:
         _result_evidence(
@@ -463,6 +524,7 @@ def _finalize_evidence(
             action_id=action_id,
             result=result,
             attempt=attempt,
+            authorization=authorization,
         )
     except Exception:
         return _with_correlation(
@@ -473,12 +535,52 @@ def _finalize_evidence(
             context,
             action_id,
             "deny",
+            authorization,
         )
     return result
 
 
 def _context_refusal(error: SecurityContextError) -> ToolResult:
     return _err(str(error), rejection_reason=error.reason.value, decision="deny")
+
+
+def _authorization_for_action(
+    context: SecurityContext,
+    tool_name: str,
+    tool_args: dict[str, Any],
+) -> ScopeDecision:
+    """Resolve and evaluate current authority without running a tool handler."""
+
+    required = (
+        required_scopes_for_action(tool_name, tool_args)
+        if tool_name in SUPPORTED_TOOL_NAMES
+        else frozenset()
+    )
+    try:
+        current: object = (
+            context.principal_resolver()
+            if context.principal_resolver is not None
+            else context.principal
+        )
+    except Exception:
+        current = object()
+    return evaluate_principal_scopes(context.principal, current, required)
+
+
+def _authorization_refusal(
+    authorization: ScopeDecision,
+) -> ToolResult:
+    reason = authorization.reason
+    if reason is AuthorizationReason.SCOPE_INSUFFICIENT:
+        message = "Council principal lacks one or more required scopes"
+    elif reason is AuthorizationReason.PRINCIPAL_REVOKED:
+        message = "Council principal authority is no longer current"
+    else:
+        message = "Council principal authorization is missing or invalid"
+    return _err(
+        message,
+        rejection_reason=reason.value,
+    )
 
 
 def invoke(tool_name: str, **tool_args: Any) -> ToolResult:
@@ -490,6 +592,7 @@ def invoke(tool_name: str, **tool_args: Any) -> ToolResult:
     except SecurityContextError as exc:
         return _context_refusal(exc)
 
+    authorization = _authorization_for_action(context, tool_name, tool_args)
     try:
         attempt = _audit(
             context,
@@ -498,6 +601,7 @@ def invoke(tool_name: str, **tool_args: Any) -> ToolResult:
             args=tool_args,
             action_id=action_id,
             decision=None,
+            authorization=authorization,
         )
     except Exception:
         return _with_correlation(
@@ -508,6 +612,25 @@ def invoke(tool_name: str, **tool_args: Any) -> ToolResult:
             context,
             action_id,
             "deny",
+            authorization,
+        )
+
+    if not authorization.allowed:
+        result = _with_correlation(
+            _authorization_refusal(authorization),
+            context,
+            action_id,
+            "deny",
+            authorization,
+        )
+        return _finalize_evidence(
+            context,
+            tool=tool_name,
+            args=tool_args,
+            action_id=action_id,
+            result=result,
+            attempt=attempt,
+            authorization=authorization,
         )
 
     handler = _TOOL_HANDLERS.get(tool_name)
@@ -520,6 +643,7 @@ def invoke(tool_name: str, **tool_args: Any) -> ToolResult:
             context,
             action_id,
             "deny",
+            authorization,
         )
         return _finalize_evidence(
             context,
@@ -528,6 +652,7 @@ def invoke(tool_name: str, **tool_args: Any) -> ToolResult:
             action_id=action_id,
             result=result,
             attempt=attempt,
+            authorization=authorization,
         )
 
     if len(context.tracker.summaries) >= context.tracker.max_tool_calls:
@@ -542,6 +667,7 @@ def invoke(tool_name: str, **tool_args: Any) -> ToolResult:
             context,
             action_id,
             "deny",
+            authorization,
         )
         return _finalize_evidence(
             context,
@@ -550,6 +676,7 @@ def invoke(tool_name: str, **tool_args: Any) -> ToolResult:
             action_id=action_id,
             result=result,
             attempt=attempt,
+            authorization=authorization,
         )
 
     try:
@@ -563,7 +690,13 @@ def invoke(tool_name: str, **tool_args: Any) -> ToolResult:
         )
 
     decision = _decision_for_result(raw_result)
-    result = _with_correlation(raw_result, context, action_id, decision)
+    result = _with_correlation(
+        raw_result,
+        context,
+        action_id,
+        decision,
+        authorization,
+    )
     summary = context.tracker.record_result(tool_name, tool_args, result)
     if summary is None:
         result = _with_correlation(
@@ -574,6 +707,7 @@ def invoke(tool_name: str, **tool_args: Any) -> ToolResult:
             context,
             action_id,
             "deny",
+            authorization,
         )
 
     return _finalize_evidence(
@@ -583,4 +717,5 @@ def invoke(tool_name: str, **tool_args: Any) -> ToolResult:
         action_id=action_id,
         result=result,
         attempt=attempt,
+        authorization=authorization,
     )

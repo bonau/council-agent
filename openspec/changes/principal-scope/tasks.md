@@ -4,14 +4,14 @@
 - [x] 1.2 Add a non-revealing typed OpenRouter provider credential that cannot be used as a Council principal.
 - [x] 1.3 Add the pure cumulative tool/action scope matrix and stable allow/deny decision reasons, including shell category requirements.
 - [x] 1.4 Add focused unit tests for valid/invalid principals, unknown scopes, masked identity stability, provider/principal type separation, and every scope-matrix row.
-- [ ] 1.5 Run `uv run pytest` and keep the full existing suite green before dispatcher integration.
+- [x] 1.5 Run `uv run pytest` and keep the full existing suite green before dispatcher integration.
 
 ## 2. Dispatcher authorization and evidence
 
-- [ ] 2.1 Extend `SecurityContext` with an expected principal binding and optional current-authority resolver without adding authentication or grant semantics.
-- [ ] 2.2 Enforce current principal and cumulative scope requirements in the mandatory dispatcher before handlers, policy, confirmation, filesystem access, or subprocess creation.
-- [ ] 2.3 Add masked authorization metadata to correlated attempt/result and session evidence while preserving audit schema-v1 compatibility.
-- [ ] 2.4 Add middleware tests for missing/invalid/mismatched/insufficient principals, scope tightening, immediate revocation, confirmation/policy non-elevation, masked audit linkage, and no side effects.
+- [x] 2.1 Extend `SecurityContext` with an expected principal binding and optional current-authority resolver without adding authentication or grant semantics.
+- [x] 2.2 Enforce current principal and cumulative scope requirements in the mandatory dispatcher before handlers, policy, confirmation, filesystem access, or subprocess creation.
+- [x] 2.3 Add masked authorization metadata to correlated attempt/result and session evidence while preserving audit schema-v1 compatibility.
+- [x] 2.4 Add middleware tests for missing/invalid/mismatched/insufficient principals, scope tightening, immediate revocation, confirmation/policy non-elevation, masked audit linkage, and no side effects.
 - [ ] 2.5 Run `uv run pytest` and keep the full suite green before orchestration/framework wiring.
 
 ## 3. Orchestration and provider boundary

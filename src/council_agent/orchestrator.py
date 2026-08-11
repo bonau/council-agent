@@ -20,6 +20,8 @@ from council_agent.security import (
     ConfirmFn,
     ConfirmMode,
     ConfirmationPolicy,
+    Principal,
+    PrincipalResolver,
     SecurityContext,
     default_audit_events_path,
     load_policy_file,
@@ -147,6 +149,8 @@ def run_council(
     project_root: Path | str | None = None,
     confirm_mode: ConfirmMode = ConfirmMode.COMPAT,
     confirm_fn: ConfirmFn | None = None,
+    principal: Principal | None = None,
+    principal_resolver: PrincipalResolver | None = None,
 ) -> CouncilResult:
     """Run the full three-phase council pipeline with optional escalation."""
     settings = get_settings()
@@ -190,6 +194,8 @@ def run_council(
             confirm_fn=confirm_fn,
         ),
         tracker=tracker,
+        principal=principal,
+        principal_resolver=principal_resolver,
         session=session,
         audit_logger=audit_logger,
     )
