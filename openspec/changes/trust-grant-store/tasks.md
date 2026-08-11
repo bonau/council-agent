@@ -36,4 +36,4 @@
 - [x] 5.2 Run `npx @fission-ai/openspec@latest validate --changes --strict`.
 - [x] 5.3 Sync the security and orchestration deltas into main specs.
 - [x] 5.4 Run `npx @fission-ai/openspec@latest validate --specs --strict`.
-- [ ] 5.5 Run `./scripts/check.sh` with the active change, archive `trust-grant-store`, then run `./scripts/check.sh` again with no active change.
+- [x] 5.5 Run `./scripts/check.sh` with the active change, archive `trust-grant-store`, then run `./scripts/check.sh` again with no active change.
