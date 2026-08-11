@@ -1,3 +1,3 @@
 """Council Agent: OpenRouter + CrewAI three-phase CLI framework."""
 
-__version__ = "0.7.0"
+__version__ = "0.8.0"
