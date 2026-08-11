@@ -447,6 +447,7 @@ alpha 才開始實作 Trust Tier 0/1/2 runtime；本紀錄中的 v0.9.x 工作�
   - full regression：291 passed，exit code 0。
   - synced main specs strict validation：security／tools 等 5 specs passed，exit code 0。
   - `./scripts/check.sh`：291 tests、active change 1/1、main specs 5/5，同一 revision `57f846f` exit code 0。
+  - post-archive `./scripts/check.sh`：291 tests、no active changes、main specs 5/5，revision `2d55164` exit code 0。
   - `cat`／`python` outside sentinel、outside `cp`／`mv` destination、mixed operands、traversal、symlink、inherited environment 與 compound syntax全部斷言 sentinel 不變且 subprocess call count 為 0。
   - `run_tests` 真實執行含空白、Unicode、引號、`;`、`$()` 與 backtick 的目錄：1 passed，exit code 0；quoted `-k` value 保持單一 argv element。
   - 詳細 test／commit 對照見 [`v0.9.1-shell-containment-evidence.md`](v0.9.1-shell-containment-evidence.md)。

@@ -4,7 +4,7 @@
 
 > **開發方式**：所有版本里程碑的實作，皆採 **Spec-driven Development** 並搭配 [OpenSpec](https://github.com/Fission-AI/OpenSpec)。每個 feature 分支應對應一個 OpenSpec change，詳見 [AGENTS.md](AGENTS.md)。
 
-## 現況（v0.9.0）
+## 現況（v0.9.1）
 
 | 能力 | 狀態 |
 |------|------|
