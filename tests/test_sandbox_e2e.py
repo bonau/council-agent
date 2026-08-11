@@ -122,6 +122,73 @@ def test_e2e_run_with_sandbox_writes_files_and_session(
     assert lines[0]["args"]["path"] == "hello.txt"
 
 
+def test_e2e_run_with_sandbox_writes_audit_events(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from council_agent.security import get_audit_logger, load_audit_events
+    from council_agent.security.audit import default_audit_events_path
+
+    monkeypatch.setenv("OPENROUTER_API_KEY", "test-key")
+    get_settings.cache_clear()
+    get_workspace_guard.cache_clear()
+
+    init_sandbox(tmp_path)
+    apply_workspace_root(tmp_path)
+    monkeypatch.chdir(tmp_path)
+
+    preset = get_preset_by_name(PRESETS_DIR, "glm-stack")
+    plan = PlanArtifact(
+        raw="{}",
+        steps=["write hello.txt"],
+        success_criteria=["file exists"],
+        risks=[],
+    )
+    verdict = VerificationVerdict(
+        status=VerdictStatus.PASS,
+        raw='{"status":"PASS"}',
+        issues=[],
+        summary="ok",
+    )
+
+    with (
+        patch(
+            "council_agent.orchestrator.build_planning_crew",
+            return_value=MagicMock(),
+        ),
+        patch(
+            "council_agent.orchestrator.run_planning",
+            return_value=plan,
+        ),
+        patch(
+            "council_agent.orchestrator.build_execution_crew",
+            side_effect=_mock_execution_build,
+        ),
+        patch(
+            "council_agent.orchestrator.build_verification_crew",
+            return_value=MagicMock(),
+        ),
+        patch(
+            "council_agent.orchestrator.run_verification",
+            return_value=verdict,
+        ),
+    ):
+        run_council(
+            "create hello.txt",
+            preset,
+            "test-key",
+            project_root=tmp_path,
+        )
+
+    assert get_audit_logger() is None
+    events = load_audit_events(default_audit_events_path(tmp_path))
+    assert len(events) == 3
+    assert {e.tool for e in events} == {"write_file", "list_dir", "run_command"}
+    session = SessionManager.latest(tmp_path)
+    assert session is not None
+    assert all(e.session_id == session.meta.session_id for e in events)
+    assert session.count_tool_lines() == 3
+
+
 def test_e2e_run_without_sandbox_skips_session_files(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

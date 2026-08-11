@@ -1,5 +1,22 @@
-"""Security helpers: command classification and confirmation (v0.6+)."""
+"""Security helpers: command classification, confirmation, and audit (v0.6+)."""
 
+from council_agent.security.audit import (
+    DEFAULT_ARG_MAX_CHARS,
+    DEFAULT_EVENTS_FILENAME,
+    TRUNCATION_MARKER,
+    AuditLogger,
+    AuditRecord,
+    audit_logger_context,
+    default_audit_events_path,
+    export_audit_events,
+    filter_audit_events,
+    get_audit_logger,
+    load_audit_events,
+    record_audit_event,
+    reset_audit_logger,
+    set_audit_logger,
+    truncate_value,
+)
 from council_agent.security.classifier import (
     ClassificationResult,
     CommandCategory,
@@ -23,6 +40,8 @@ from council_agent.security.confirm import (
 
 __all__ = [
     "ActionKind",
+    "AuditLogger",
+    "AuditRecord",
     "ClassificationResult",
     "CommandCategory",
     "ConfirmFn",
@@ -30,12 +49,25 @@ __all__ = [
     "ConfirmationOutcome",
     "ConfirmationPolicy",
     "ConfirmationResult",
+    "DEFAULT_ARG_MAX_CHARS",
+    "DEFAULT_EVENTS_FILENAME",
+    "TRUNCATION_MARKER",
+    "audit_logger_context",
     "classify_command",
     "confirmation_policy",
+    "default_audit_events_path",
     "default_confirm_fn",
+    "export_audit_events",
+    "filter_audit_events",
+    "get_audit_logger",
     "get_confirmation_policy",
+    "load_audit_events",
+    "record_audit_event",
     "require_confirmation",
+    "reset_audit_logger",
     "reset_confirmation_policy",
     "resolve_cli_confirm_mode",
+    "set_audit_logger",
     "set_confirmation_policy",
+    "truncate_value",
 ]

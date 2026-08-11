@@ -94,6 +94,45 @@ def test_wrapper_appends_to_session(workspace_root: Path) -> None:
     assert session.count_tool_lines() == 1
 
 
+def test_wrapper_appends_to_audit_when_logger_installed(workspace_root: Path) -> None:
+    from council_agent.security import (
+        AuditLogger,
+        default_audit_events_path,
+        get_audit_logger,
+        load_audit_events,
+        reset_audit_logger,
+        set_audit_logger,
+    )
+
+    init_sandbox(workspace_root)
+    session = SessionManager.create(
+        prompt="p",
+        preset="glm-stack",
+        workspace_root=workspace_root,
+        project_root=workspace_root,
+    )
+    logger = AuditLogger(
+        default_audit_events_path(workspace_root),
+        session_id=session.meta.session_id,
+    )
+    token = set_audit_logger(logger)
+    try:
+        tracker = ToolCallTracker(max_tool_calls=5)
+        tools = _tools_by_name(tracker, session=session)
+        tools["write_file"].run(path="audited.txt", content="z")
+    finally:
+        reset_audit_logger(token)
+
+    assert get_audit_logger() is None
+    events = load_audit_events(default_audit_events_path(workspace_root))
+    assert len(events) == 1
+    assert events[0].tool == "write_file"
+    assert events[0].args["path"] == "audited.txt"
+    assert events[0].session_id == session.meta.session_id
+    assert events[0].success is True
+    assert session.count_tool_lines() == 1
+
+
 @patch("council_agent.crews.execution.Crew")
 @patch("council_agent.crews.execution.Task")
 @patch("council_agent.crews.execution.Agent")

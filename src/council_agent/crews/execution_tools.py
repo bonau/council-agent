@@ -8,6 +8,7 @@ from typing import Any
 from crewai.tools import tool
 
 from council_agent.sandbox.session import SessionManager
+from council_agent.security import record_audit_event
 from council_agent.tools import (
     ToolCallTracker,
     ToolResult,
@@ -63,6 +64,15 @@ def _invoke(
             output=summary.output,
             error=summary.error,
         )
+
+    record_audit_event(
+        name,
+        args,
+        success=summary.success,
+        error=summary.error,
+        metadata=summary.metadata,
+        session_id=session.meta.session_id if session is not None else None,
+    )
 
     result = TR(
         success=summary.success,

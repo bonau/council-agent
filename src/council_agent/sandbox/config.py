@@ -31,6 +31,10 @@ def sessions_dir(project_root: Path) -> Path:
     return council_dir(project_root) / "sessions"
 
 
+def audit_dir(project_root: Path) -> Path:
+    return council_dir(project_root) / "audit"
+
+
 def is_sandbox_initialized(project_root: Path) -> bool:
     return config_path(project_root).is_file()
 
@@ -47,6 +51,7 @@ def write_council_config(project_root: Path, config: CouncilConfig) -> None:
     council = council_dir(project_root)
     council.mkdir(parents=True, exist_ok=True)
     sessions_dir(project_root).mkdir(parents=True, exist_ok=True)
+    audit_dir(project_root).mkdir(parents=True, exist_ok=True)
     payload = config.model_dump()
     config_path(project_root).write_text(
         yaml.safe_dump(payload, sort_keys=False, allow_unicode=True),
@@ -55,10 +60,11 @@ def write_council_config(project_root: Path, config: CouncilConfig) -> None:
 
 
 def init_sandbox(project_root: Path) -> CouncilConfig:
-    """Create `.council/` idempotently; never delete existing sessions."""
+    """Create `.council/` idempotently; never delete existing sessions or audit."""
     root = Path(project_root).expanduser().resolve()
     root.mkdir(parents=True, exist_ok=True)
     sessions_dir(root).mkdir(parents=True, exist_ok=True)
+    audit_dir(root).mkdir(parents=True, exist_ok=True)
 
     path = config_path(root)
     if path.is_file():
@@ -67,12 +73,14 @@ def init_sandbox(project_root: Path) -> CouncilConfig:
         if Path(existing.workspace_root).resolve() != root:
             existing = existing.model_copy(update={"workspace_root": str(root)})
             write_council_config(root, existing)
+        else:
+            # Ensure audit/ exists even for older sandboxes without rewriting config.
+            audit_dir(root).mkdir(parents=True, exist_ok=True)
         return existing
 
     config = CouncilConfig(workspace_root=str(root))
     write_council_config(root, config)
     return config
-
 
 def clear_workspace_caches() -> None:
     get_settings.cache_clear()
