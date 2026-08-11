@@ -1,0 +1,64 @@
+{
+  "baseline": {
+    "package_version": "0.9.9",
+    "commit": "4f41a8753897b295142e62ddfd6d4a6e1017493e",
+    "os": "Linux 6.12.94+ x86_64",
+    "python_version": "3.12.3"
+  },
+  "sentinel_before": "195d0b093d2a28f8bf7243ba4ec492c250af631fa2666f284870dd4e11ef4750",
+  "sentinel_after": "195d0b093d2a28f8bf7243ba4ec492c250af631fa2666f284870dd4e11ef4750",
+  "sentinel_unchanged": true,
+  "cases": [
+    {
+      "case_id": "SMK-00",
+      "result": "PASS",
+      "note": "council --help exit 0; version 0.9.9 via uv run"
+    },
+    {
+      "case_id": "SMK-01",
+      "result": "PASS",
+      "note": "sandbox init x2 + status exit 0; .council present"
+    },
+    {
+      "case_id": "SMK-02",
+      "result": "PASS",
+      "note": "w=True r=True"
+    },
+    {
+      "case_id": "SMK-03",
+      "result": "PASS",
+      "note": "['workspace_boundary', 'workspace_boundary', 'workspace_boundary', 'denied_path']"
+    },
+    {
+      "case_id": "SMK-04",
+      "result": "PASS",
+      "note": "deny=policy_denied policy_read=denied_path typo=True"
+    },
+    {
+      "case_id": "SMK-05",
+      "result": "PASS",
+      "note": "refuse=confirmation_refused auto_deny=policy_denied"
+    },
+    {
+      "case_id": "SMK-06",
+      "result": "PASS",
+      "note": "['confirmation_refused', 'confirmation_refused', 'shell_metachar', 'shell_metachar', 'unsupported']"
+    },
+    {
+      "case_id": "SMK-07",
+      "result": "PASS",
+      "note": "good=True inj=shell_metachar"
+    },
+    {
+      "case_id": "SMK-08",
+      "result": "PASS",
+      "note": "blocked=denied_path leaked=False events=4"
+    },
+    {
+      "case_id": "SMK-09",
+      "result": "PASS",
+      "note": "attempt=admission-attempt-1"
+    }
+  ],
+  "live_01": "BLOCKED"
+}
