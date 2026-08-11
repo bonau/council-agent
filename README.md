@@ -184,7 +184,9 @@ Policy 在 command analysis 與路徑驗證後、confirmation 前套用。`run_c
 
 例如 `COUNCIL_PRINCIPAL_SCOPES=read` 是 read-only principal，不能以 `run_tests`、shell、Crew wrapper、project allowlist 或 `--yes` 間接取得 mutate 權限。Scope decision 每個 action 重新解析；缺 principal、scope 不足、identity mismatch 或 resolver revoke 一律在 tool handler 前 fail closed。
 
-這是 authorization scope model，不是 authentication：local principal 設定、session UUID 與 `--yes` 都不能證明使用者身分。Session authentication、user-owned grant store 與 Trust Tier runtime 仍分別留待 v0.9.6、v0.9.7 與 v1.0。
+Local principal設定與session UUID本身仍不是authentication。v0.9.6的產品orchestrator會對需要`high-risk:manage`的action要求fresh step-up：`COUNCIL_AUTH_SECRET`作為獨立service/test verifier，產生綁定principal、workspace、runtime session、purpose、exact action與期限的one-use challenge/token。Missing、expired、revoked、replayed或錯綁定proof都在policy／confirmation／handler前fail closed；`--yes`只選confirmation auto，不能取代authentication。
+
+Authentication state只存在process memory，restart會使outstanding challenge/token失效；raw verifier、challenge、response與token不寫入audit、session或console。Direct library `SecurityContext`為相容性預設不啟用step-up requirement，可明確設定`require_high_risk_step_up=True`。Persistent user-owned grant/revoke store與Trust Tier runtime仍分別留待v0.9.7與v1.0。
 
 ## 環境變數
 
@@ -193,6 +195,7 @@ Policy 在 command analysis 與路徑驗證後、confirmation 前套用。`run_c
 | `OPENROUTER_API_KEY` | 只供模型連線的 OpenRouter provider API 金鑰 | （必填） |
 | `COUNCIL_PRINCIPAL_ID` | Council local principal 穩定 ID（audit 只記遮罩 reference） | 本機 OS user |
 | `COUNCIL_PRINCIPAL_SCOPES` | Council tool scopes（逗號分隔、未知值 fail-fast） | 全部五種 scope |
+| `COUNCIL_AUTH_SECRET` | High-risk action 的process-local service/test step-up verifier（與`--yes`、provider key、scopes分離） | 未設定；high-risk fail closed |
 | `COUNCIL_DEFAULT_PRESET` | 預設 preset 名稱 | `glm-stack` |
 | `COUNCIL_WORKSPACE_ROOT` | Tool 工作區根目錄 | 目前工作目錄 |
 | `COUNCIL_MAX_TOOL_CALLS` | 單次 run 的 tool 呼叫上限 | `50` |
