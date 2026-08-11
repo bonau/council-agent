@@ -1,6 +1,6 @@
 [project]
 name = "council-agent"
-version = "0.9.8"
+version = "0.9.9"
 description = "OpenRouter + CrewAI three-phase CLI framework (planning, execution, verification)"
 readme = "README.md"
 requires-python = ">=3.11"
