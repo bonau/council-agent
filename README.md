@@ -10,16 +10,16 @@ OpenRouter + CrewAI 三階段 CLI 框架：每次推論依序經過 **計劃 →
 - 校驗失敗時自動 escalation（可設定 `max_retries`）
 - Tool 基礎層：`read_file`、`write_file`、`list_dir`、`delete_file`、`run_command`、`run_tests`
 - Execution Crew 掛載上述 tools，可在工作區內實際改檔與跑測試
-- `WorkspaceGuard` 限制檔案與 shell 操作在工作區內
-- 指令分類：`read` / `write` / `dangerous` pattern 啟發式
-- 互動確認：危險／寫入 shell 與 `write_file`／`delete_file` 在 CLI 執行時需確認；`--yes` 跳過；無 TTY 預設拒絕
-- 結構化審計日誌：sandbox 已初始化時，tool 呼叫寫入 `.council/audit/events.jsonl`；可用 `council audit show`／`export` 檢視與匯出
-- 專案政策檔：可選根目錄 `council.policy.yaml`（允許／拒絕指令 pattern、額外敏感路徑）；以 Pydantic 驗證
+- `WorkspaceGuard`：filesystem tools 驗證路徑落在工作區內；`run_command` **目前只驗證 subprocess 的 cwd**，shell 內部仍可能存取工作區外路徑
+- 指令分類：`read` / `write` / `dangerous` pattern 啟發式（**未命中時預設為 `read`**）
+- 互動確認：危險／寫入 shell 與 `write_file`／`delete_file` 在 CLI 執行時需確認；`--yes` 跳過確認（**不是** Trust Tier 或已驗證授權）；無 TTY 預設拒絕
+- 結構化審計日誌：sandbox 已初始化時，CrewAI wrapper 路徑寫入 `.council/audit/events.jsonl`；可用 `council audit show`／`export`（尚無 hash chain／secret redaction）
+- 專案政策檔：可選根目錄 `council.policy.yaml`（允許／拒絕指令 pattern、額外敏感路徑）；以 Pydantic 驗證（未知欄位目前會被忽略）
 - Tool 呼叫追蹤與 `max_tool_calls` 上限（預設 50）
 - Verification 可接收結構化 tool 執行摘要（含 pytest 結果）
 - 可選 `.council/` sandbox：session 紀錄（`meta.json` + `tools.jsonl`）與跨 session 審計（`audit/events.jsonl`）
 
-> **安全提示**：`run_command` 使用 `shell=True`。指令分類為 pattern 啟發式；CLI 會對危險／寫入操作要求確認（或在無 TTY 時拒絕），CI 請加 `--yes`。可用 `council.policy.yaml` 覆寫允許／拒絕規則與敏感路徑，但仍**不是**完整信任框架（尚無 Trust Tier、`council trust`、Policy Middleware、hash chain）。請僅在信任的專案目錄使用，並避免將不受信任的 prompt 直接餵給 Agent。後續規劃見 [ROADMAP.md](ROADMAP.md) v1.0。
+> **安全提示**：`run_command` 使用 `shell=True`，**不是** OS／容器級 sandbox。指令分類為 pattern 啟發式；`ConfirmMode`／`--yes` **不等於** Trust Tier。可用 `council.policy.yaml` 覆寫規則，但政策檔位於 Agent 可寫的專案目錄。仍**不是**完整信任框架（尚無 Trust Tier、`council trust`、統一 Policy Middleware、principal、hash chain）。請僅在信任的專案目錄與可丟棄環境使用，並避免將不受信任的 prompt 直接餵給 Agent。v1.0 前清債與測試文件見 [docs/index.md](docs/index.md)、[ROADMAP.md](ROADMAP.md)。
 
 ## Presets
 

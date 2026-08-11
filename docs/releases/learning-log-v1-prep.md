@@ -397,3 +397,27 @@ alpha 才開始實作 Trust Tier 0/1/2 runtime；本紀錄中的 v0.9.x 工作�
 - 剩餘風險：`v1-prep` 未完成前，不得宣稱完整 release gate 通過，也不得進 alpha。
 - 文件影響：本紀錄明列阻斷；playbook 保持「tag 前不得有 active change」規則。
 - 下一步：由 `v1-prep` 擁有者完成或移除該 change 後，重新執行 `./scripts/check.sh`。
+
+### 2026-08-11 14:54 UTC — 測試文件與已知問題清單落地
+
+- 狀態：通過
+- 基準：branch `cursor/v1-prep-d691`、package v0.9.0、active change `v1-prep`
+- 觀察：已建立文件入口、公開測試手冊、真人案例、機器檢查清單、issue 回報範本、v1.0-alpha 已知問題與 smoke suite。
+- 決策：文件明列 shell 只驗證 `cwd`、classifier fail-open、project policy 與 audit 的現行限制；v0.9.0 預期失敗不得算 release gate 通過。
+- 剩餘風險：v0.9.1–v0.9.9 尚未完成；公開 beta 前所有 P0 必須關閉。
+- 下一步：完成 OpenSpec v1-prep artifacts
+
+### 2026-08-11 15:01 UTC — OpenSpec v1-prep sync／validate／archive
+
+- 狀態：通過
+- 基準：branch `cursor/v1-prep-d691`、package v0.9.0、change `v1-prep` → `openspec/changes/archive/2026-08-11-v1-prep`
+- 觀察：
+  - `./scripts/check.sh`：182 passed；changes／specs strict 全綠（含新 capability `release-prep`）。
+  - 文件入口 `docs/index.md`、公開測試、smoke、known-issues、playbook、learning-log 已落地。
+  - ROADMAP／README／LESSONS 已校正過度宣稱並寫入 v0.9.1–v0.9.9 序列。
+- 矛盾或風險：產品 P0／P1 **尚未修正**（僅盤點與閘門）；不得進 alpha。
+- 決策：本 change 僅文件／流程契約；runtime 清債由後續獨立 change 依序執行。
+- 驗證：`./scripts/check.sh` exit 0；evidence 為本機 CI 輸出。
+- 剩餘風險：v0.9.1 shell containment 未開工前，shell 越界與 classifier fail-open 仍在。
+- 文件影響：`openspec/specs/release-prep/spec.md` 成為來源真相之一。
+- 下一步：開 OpenSpec change `shell-containment`（目標 release v0.9.1），依 playbook 執行。

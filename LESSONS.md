@@ -167,6 +167,23 @@ def test_write_and_read_file(tmp_path: Path) -> None:
 - [ ] `pyproject.toml` + `__init__.py` 版本一致
 - [ ] `main` 已 tag、`develop` 已 merge release
 
+### 主要版本發行準備（v1.0）
+
+進入 Trust Tier／主要版本前，先跑 [docs/releases/major-release-prep-playbook.md](docs/releases/major-release-prep-playbook.md)：
+
+1. 盤點 ROADMAP ↔ specs ↔ archive ↔ 程式 ↔ 文件矛盾，分級 P0／P1／P2。
+2. **一版一主要問題**（v0.9.1–v0.9.9）；不可把 Trust Tier runtime 塞進清債 patch。
+3. 每一步追加 [docs/releases/learning-log-v1-prep.md](docs/releases/learning-log-v1-prep.md)；證據遮罩秘密。
+4. v1.0-alpha 前關閉全部 P0／P1；公開 beta 前關閉全部 P0 並就緒 `docs/testing/`。
+5. 文件宣稱必須低於或等於實際保證：filesystem ≠ shell sandbox；`ConfirmMode` ≠ Trust Tier；`--yes` ≠ 授權。
+
+常見誤判：
+
+- README「shell 限制在工作區」若未說明「僅 cwd」，屬過度宣稱。
+- classifier 未命中 → `read` 是 fail-open，不能當 allowlist。
+- audit「append-only」只描述 logger API，不表示檔案不可被 Agent 刪改。
+- 裸 `openspec validate --strict` 通過 ≠ 驗證通過。
+
 ---
 
 ## 設計假設（需後續驗證）
