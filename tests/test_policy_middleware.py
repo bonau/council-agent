@@ -12,6 +12,7 @@ import pytest
 from council_agent.sandbox.session import SessionManager, SessionMeta
 from council_agent.security import CouncilPolicy, active_policy
 from council_agent.security.audit import AuditLogger, load_audit_events
+from council_agent.security.redaction import REDACTION_MARKER
 from council_agent.security.middleware import (
     POLICY_VERSION_BUILTIN,
     POLICY_VERSION_PROJECT_V1,
@@ -195,6 +196,7 @@ def test_unknown_tool_is_denied_and_audited(tmp_path: Path) -> None:
     events = load_audit_events(audit_path)
     assert [event.phase for event in events] == ["attempt", "result"]
     assert events[0].action_id == events[1].action_id
+    assert events[1].attempt_event_id == events[0].event_id
     assert events[1].decision == "deny"
 
 
@@ -228,6 +230,7 @@ def test_limit_denial_does_not_call_or_track_handler(
     events = load_audit_events(audit_path)
     assert [event.phase for event in events] == ["attempt", "result"]
     assert events[0].action_id == events[1].action_id
+    assert events[1].attempt_event_id == events[0].event_id
     assert events[1].decision == "deny"
 
 
@@ -255,6 +258,7 @@ def test_success_emits_correlated_attempt_and_result(
     assert completed.decision == "allow"
     assert attempt.request_id == completed.request_id == "request-audit"
     assert attempt.action_id == completed.action_id == result.metadata["action_id"]
+    assert completed.attempt_event_id == attempt.event_id
 
 
 def test_legacy_audit_line_loads_with_result_defaults(tmp_path: Path) -> None:
@@ -335,3 +339,92 @@ def test_session_receives_one_correlated_result(
     assert result.success is True
     assert session.count_tool_lines() == 1
     assert session.meta.tool_call_count == 1
+    line = json.loads(session.tools_path.read_text(encoding="utf-8"))
+    assert line["request_id"] == result.metadata["request_id"]
+    assert line["action_id"] == result.metadata["action_id"]
+
+
+def test_session_links_exact_audit_events_and_redacts_all_result_fields(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    secret = "sk-or-v1-abcdefghijklmnopqrstuv"
+
+    def handler(_context: SecurityContext, **_kwargs: object) -> ToolResult:
+        return ToolResult(
+            success=False,
+            output=f"Authorization: Bearer {secret}",
+            error=f"password={secret}",
+            metadata={"access_token": secret},
+        )
+
+    monkeypatch.setitem(_TOOL_HANDLERS, "read_file", handler)
+    session_dir = tmp_path / "session"
+    session_dir.mkdir()
+    session = SessionManager(
+        session_dir,
+        SessionMeta(
+            session_id="session-1",
+            prompt="p",
+            preset="test",
+            workspace_root=str(tmp_path),
+            started_at="2026-08-11T00:00:00+00:00",
+        ),
+    )
+    session.tools_path.write_text("", encoding="utf-8")
+    audit_path = tmp_path / "audit" / "events.jsonl"
+    context = SecurityContext.create(
+        tmp_path,
+        request_id="request-secret",
+        session=session,
+        audit_logger=AuditLogger(audit_path, session_id="session-1"),
+    )
+
+    with security_context(context):
+        result = invoke("read_file", token=secret)
+
+    events = load_audit_events(audit_path)
+    session_text = session.tools_path.read_text(encoding="utf-8")
+    session_line = json.loads(session_text)
+    audit_text = audit_path.read_text(encoding="utf-8")
+    assert result.success is False
+    assert secret not in audit_text
+    assert secret not in session_text
+    assert REDACTION_MARKER in audit_text
+    assert REDACTION_MARKER in session_text
+    assert events[1].attempt_event_id == events[0].event_id
+    assert session_line["request_id"] == "request-secret"
+    assert session_line["action_id"] == result.metadata["action_id"]
+    assert session_line["audit_attempt_event_id"] == events[0].event_id
+    assert session_line["audit_result_event_id"] == events[1].event_id
+
+
+def test_audit_attempt_failure_denies_before_handler_without_secret_echo(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    called = False
+
+    def handler(_context: SecurityContext, **_kwargs: object) -> ToolResult:
+        nonlocal called
+        called = True
+        return ToolResult(success=True, output="unexpected")
+
+    monkeypatch.setitem(_TOOL_HANDLERS, "read_file", handler)
+    logger = AuditLogger(tmp_path / "audit" / "events.jsonl")
+    monkeypatch.setattr(
+        logger,
+        "record",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(
+            RuntimeError("api_key=must-not-echo")
+        ),
+    )
+    context = SecurityContext.create(tmp_path, audit_logger=logger)
+
+    with security_context(context):
+        result = invoke("read_file", path="a.txt")
+
+    assert result.success is False
+    assert result.metadata["rejection_reason"] == "audit_failure"
+    assert "must-not-echo" not in (result.error or "")
+    assert called is False

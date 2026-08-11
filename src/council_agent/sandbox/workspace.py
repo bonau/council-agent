@@ -12,8 +12,20 @@ DEFAULT_DENIED_PATTERNS: tuple[str, ...] = (
     ".env",
     ".git",
     ".git/**",
+    ".council",
+    "**/.council",
+    "**/.council/**",
     ".council/secrets",
     ".council/secrets/**",
+    ".council/audit",
+    ".council/audit/**",
+    ".council/sessions",
+    ".council/sessions/**",
+    ".council/config.yaml",
+    ".council/auth",
+    ".council/auth/**",
+    ".council/grants",
+    ".council/grants/**",
     "council.policy.yaml",
     "**/council.policy.yaml",
 )
@@ -113,7 +125,12 @@ class WorkspaceGuard:
     def _matches_pattern(posix_path: str, pattern: str) -> bool:
         if pattern.endswith("/**"):
             prefix = pattern[:-3]
-            return posix_path == prefix or posix_path.startswith(f"{prefix}/")
+            if not any(character in prefix for character in "*?["):
+                return posix_path == prefix or posix_path.startswith(f"{prefix}/")
+            return fnmatch.fnmatch(posix_path, prefix) or fnmatch.fnmatch(
+                posix_path,
+                f"{prefix}/*",
+            )
         if fnmatch.fnmatch(posix_path, pattern):
             return True
         if "/" not in pattern:

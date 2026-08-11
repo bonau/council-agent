@@ -550,3 +550,52 @@ alpha 才開始實作 Trust Tier 0/1/2 runtime；本紀錄中的 v0.9.x 工作�
 - 文件影響：README、known issues、v0.9.x handoff、security／sandbox／orchestration deltas與本 learning log 更新；feature branch 不 bump version。
 - Archive：17/17 tasks complete；delta 已同步；change 移至 `openspec/changes/archive/2026-08-11-policy-trust-boundary/`。
 - 下一步：合併 feature PR；之後只在 `release/0.9.3` 做版本 bump／tag。
+
+### 2026-08-11 17:49 UTC — v0.9.3 tagged
+
+- 狀態：通過
+- 基準：tag `v0.9.3`
+- 驗證：334 passed
+- 下一步：v0.9.4 audit-integrity
+
+### 2026-08-11 — v0.9.4 audit-integrity implementation
+
+- 狀態：implementation與active-change gate通過，已archive，等待 post-archive gate／feature merge
+- 基準：branch `cursor/v094-audit-integrity-d691`、package v0.9.3、change `audit-integrity`
+- 原始邊界問題：
+  - `.council/audit/`、sessions與sandbox control data位於 Agent workspace；policy file雖已保護，父 `.council` 與 nested control plane仍可被支援的 path action指定。
+  - Audit只有 truncation；session prompt／args／metadata／output／error未共用 secret sanitation。
+  - Event無 schema discriminator、sequence、stable content identity或 exact attempt reference；gap、duplicate、partial line與field mutation無法和正常 history區分。
+- 決策：
+  - Built-in guard保護 root／nested `.council` 整個 control plane及 policy files。保護 parent root避免 `rm -rf .council` 繞過 child rules；project policy仍只能增加 deny。
+  - 共用 recursive sanitizer先依 normalized sensitive key遮罩，再處理 assignment、Bearer、JWT、provider prefix與PEM private key，最後 truncation；legacy load/export同樣 sanitation。
+  - Schema-v1 canonical JSON涵蓋 `event_id` 外所有 persisted fields；`event_id=sha256:<digest>`，sequence在 per-path/POSIX process lock中分配並 append+`fsync`。
+  - Middleware result保存 exact `attempt_event_id`；session line保存同一 request/action及 audit attempt/result IDs。Attempt persistence失敗在 handler前 fail closed。
+  - Legacy不重寫且 status=`legacy_unverified`；invalid log是 typed failure而不是 empty。Filtered export保留原 event IDs，不重新包裝成虛構的完整 log。
+- Redaction／兼容性：
+  - POSIX control dirs/files重申 `0700`／`0600`；host owner/root仍可修改。
+  - Agent product tools無法直接 read/list/write/delete `.council`；`council sandbox`／audit CLI與orchestrator內部 writer不走 Agent tool path。
+  - Pattern redaction可能誤遮罩或漏掉未建模格式；新增格式應集中擴充，不在各 writer各自實作。
+- 漸進驗證：
+  - Audit redaction/envelope/tamper/multi-process writer：23 passed。
+  - Guard/shell/session/permission：101 passed。
+  - Middleware/CLI/sandbox integration：41 passed。
+  - Full regression：375 passed。
+  - Active-change `./scripts/check.sh`：375 passed；changes strict 1/1；main specs strict 5/5；exit code 0。
+  - Archive：15/15 tasks complete；delta已同步；`openspec/changes/archive/2026-08-11-audit-integrity/`。
+  - Post-archive結果待 final gate 後回填。
+- 詳細 evidence：[`v0.9.4-audit-integrity-evidence.md`](v0.9.4-audit-integrity-evidence.md)。
+- 剩餘風險／延期責任：
+  - Per-event digest不是 predecessor hash chain；沒有 externally signed/anchored head，無法可靠偵測 tail deletion或 whole-log self-consistent replacement。完整 integrity product仍屬 v1.0。
+  - Product path deny不是 OS sandbox；`run_tests` project code、host user/root及 arbitrary external process仍可能修改 control plane。
+  - Principal／scope、session authentication、workspace外 user-owned grant store與decision matrix仍依 v0.9.5–v0.9.8。
+  - Trust Tier 0/1/2 runtime與 `council trust` 仍只屬 v1.0-alpha。
+- 文件影響：known issues、v0.9.x handoff、security/sandbox/orchestration/tools deltas與本 learning log；feature branch不 bump package version。
+- 下一步：完成 post-archive gate並合併 feature；後續 change 是 v0.9.5 `principal-scope`。
+
+### 2026-08-11 18:10 UTC — v0.9.4 tagged
+
+- 狀態：通過
+- 基準：tag `v0.9.4`
+- 驗證：375 passed
+- 下一步：v0.9.5 principal-scope
