@@ -20,14 +20,14 @@
 - [x] 3.2 Install one context across planning, execution, verification, and escalation and guarantee cleanup/fail-closed behavior on success and exceptions
 - [x] 3.3 Preserve read-only compatibility getters while removing independent policy/confirmation/audit ContextVar installation from the product orchestrator
 - [x] 3.4 Add orchestrator tests for one snapshot, sandbox/no-sandbox behavior, cleanup, invalid policy before context, and exception paths
-- [ ] 3.5 Commit and push the orchestration phase, then run `uv run pytest` with the full existing suite green
+- [x] 3.5 Commit and push the orchestration phase, then run `uv run pytest` with the full existing suite green
 
 ## 4. CrewAI Adapter and End-to-End Integration
 
-- [ ] 4.1 Reduce `crews/execution_tools.py` to typed CrewAI-to-public-tool adapters and result formatting only
-- [ ] 4.2 Remove tracker/session binding from adapter construction while keeping middleware-owned summaries available to Verification
-- [ ] 4.3 Add Crew/direct consistency, no duplicate tracker/session/audit, limit denial, missing-context, and sandboxed end-to-end tests
-- [ ] 4.4 Commit and push the Crew/e2e phase, then run `uv run pytest` with all existing and new tests green
+- [x] 4.1 Reduce `crews/execution_tools.py` to typed CrewAI-to-public-tool adapters and result formatting only
+- [x] 4.2 Remove tracker/session binding from adapter construction while keeping middleware-owned summaries available to Verification
+- [x] 4.3 Add Crew/direct consistency, no duplicate tracker/session/audit, limit denial, missing-context, and sandboxed end-to-end tests
+- [x] 4.4 Commit and push the Crew/e2e phase, then run `uv run pytest` with all existing and new tests green
 
 ## 5. Documentation
 
