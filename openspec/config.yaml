@@ -9,7 +9,7 @@ context: |
   Testing: uv run pytest
   Docs: README.md, ROADMAP.md, CONTRIBUTING.md, AGENTS.md
   Development policy: Spec-driven Development with OpenSpec (see AGENTS.md)
-  Current version: v1.0.0-alpha.1 — Trust Tier 0/1/2 runtime (`--trust-tier`); matrix-v2; exact grant consumption on product path
+  Current version: v1.0.0-beta.1 — Trust Tier runtime frozen for public beta; no new security semantics
   Capabilities: tools (filesystem, shell, run_tests, CrewAI wrappers, policy gates on run_command), sandbox (WorkspaceGuard with policy denied_paths union, session, CLI, audit dir), orchestration (tracker, max_tool_calls, auto summaries, confirmation policy, audit logger install, project policy install), security (command classifier, interactive confirmation modes ask/auto/refuse/compat, structured audit JSONL + council audit show/export, council.policy.yaml allow/deny commands and denied_paths)
 
 rules:
