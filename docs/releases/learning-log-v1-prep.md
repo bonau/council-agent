@@ -785,7 +785,7 @@ alpha 才開始實作 Trust Tier 0/1/2 runtime；本紀錄中的 v0.9.x 工作�
 
 ### 2026-08-11 20:00 UTC — v0.9.9 evidence-closure implementation
 
-- 狀態：runtime、attempt correlation、evidence floor與文件校正完成；final sync/archive gate進行中
+- 狀態：runtime、attempt correlation、evidence floor、文件校正、sync／archive與active／post-archive gates全部通過
 - 基準：branch `cursor/v099-evidence-closure-d691`、package `0.9.8`不bump、change `evidence-closure`
 - 原始問題（V1-010／SEC-P1-002）：
   - Escalation替換execution/final output後不重新Verification，舊verdict可能與新output不一致。
@@ -803,6 +803,7 @@ alpha 才開始實作 Trust Tier 0/1/2 runtime；本紀錄中的 v0.9.x 工作�
   - Escalation integration首次565 passed／1 failed，找到legacy no-attempt `run_execution` summary compatibility；修正並推送後566 passed。
   - E2E/docs phase：568 passed。
   - Active-change `./scripts/check.sh`：568 passed；change 1/1、main specs 5/5 strict passed；exit 0。
+  - Post-archive `./scripts/check.sh`：568 passed；active changes 0、main specs 5/5 strict passed；exit 0。
 - 文件影響（V1-011）：
   - README／ROADMAP／known issues／handoff與`docs/testing/`已把current candidate和歷史v0.9.0 expected failures分離。
   - Current claims包括fail-closed simple grammar、mandatory dispatcher、principal/auth/grant-store foundation/matrix、redacted sequenced per-event audit與attempt closure。
@@ -810,7 +811,7 @@ alpha 才開始實作 Trust Tier 0/1/2 runtime；本紀錄中的 v0.9.x 工作�
   - 獨立真人與無前置脈絡Agent走手冊仍是alpha admission gate；本feature不虛構外部執行證據。
 - Evidence：[`v0.9.9-evidence-closure-evidence.md`](v0.9.9-evidence-closure-evidence.md)。
 - Archive：orchestration／release-prep／sandbox／security delta已sync；change移至`openspec/changes/archive/2026-08-11-evidence-closure/`。
-- 下一步：完成sync/archive/post-archive gate後停止本序列；不得在此branch開Trust Tier runtime或bump version。
+- 下一步：本序列停止；不得在此branch開Trust Tier runtime或bump version。v1.0-alpha須由後續獨立change處理。
 
 ### 2026-08-11 20:00 UTC — v0.9.9 tagged；清債序列結束
 
