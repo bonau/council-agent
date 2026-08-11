@@ -42,5 +42,5 @@
 - [x] 6.1 Run `uv run pytest` and record the final test count
 - [x] 6.2 Run `npx @fission-ai/openspec@latest validate --changes --strict`
 - [x] 6.3 Sync security, tools, and orchestration deltas into `openspec/specs/` and inspect the merged requirements
-- [ ] 6.4 Run `npx @fission-ai/openspec@latest validate --specs --strict`
+- [x] 6.4 Run `npx @fission-ai/openspec@latest validate --specs --strict`
 - [ ] 6.5 Run `./scripts/check.sh`, confirm no version fields changed, and make the final pre-archive commit/push
