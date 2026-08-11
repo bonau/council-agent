@@ -775,3 +775,10 @@ alpha 才開始實作 Trust Tier 0/1/2 runtime；本紀錄中的 v0.9.x 工作�
 - 文件影響：known issues關閉V1-009／SEC-P0-005的matrix scope、handoff進入v0.9.8、security/tools/orchestration delta與本learning log；feature branch不bump version。
 - Archive：21/21 tasks complete；security/tools/orchestration delta已同步；change移至`openspec/changes/archive/2026-08-11-trust-decision-matrix/`。
 - 下一步：合併feature PR；之後只接v0.9.9 `evidence-closure`，不得開Trust Tier runtime。只有後續`release/0.9.8`可做版本bump/tag。
+
+### 2026-08-11 19:42 UTC — v0.9.8 tagged
+
+- 狀態：通過
+- 基準：tag `v0.9.8`
+- 驗證：553 passed
+- 下一步：v0.9.9 evidence-closure（清債序列最後一版；之後停止於 v1.0-alpha 前）
