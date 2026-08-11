@@ -468,7 +468,7 @@ alpha 才開始實作 Trust Tier 0/1/2 runtime；本紀錄中的 v0.9.x 工作�
 
 ### 2026-08-11 17:26 UTC — v0.9.2 Policy Middleware 實作與 regression
 
-- 狀態：runtime／integration regression 通過；OpenSpec sync／archive 與 post-archive gate 待完成
+- 狀態：runtime／integration regression、OpenSpec sync 與 active-change gate 通過；archive／post-archive gate 待完成
 - 基準：branch `cursor/v092-policy-middleware-d691`、pre-archive implementation revision `884e278`、package v0.9.1、change `policy-middleware`
 - 原始旁路：
   - direct `tools.filesystem`／`tools.shell` 呼叫只執行 tool-local guard，沒有 wrapper-owned tracker、session、audit。
@@ -539,6 +539,7 @@ alpha 才開始實作 Trust Tier 0/1/2 runtime；本紀錄中的 v0.9.x 工作�
   - root／nested policy guard、public read/write/delete、shell no-process sentinel phase：334 passed，exit code 0。
   - Unknown、typo、wrong version、secret-bearing `grant` error、known+unknown whole-file refusal均有單元測試；invalid policy 在 session／context／crew 建立前失敗。
   - Public filesystem 與 `rm council.policy.yaml` refusal 斷言原始內容不變，shell subprocess call count 為 0。
+  - Active-change `./scripts/check.sh`：334 passed；changes strict 1/1；main specs strict 5/5；exit code 0。
   - 詳細 evidence：[`v0.9.3-policy-trust-boundary-evidence.md`](v0.9.3-policy-trust-boundary-evidence.md)。
 - 剩餘風險／延期責任：
   - Path deny 是 product tool boundary，不是 OS sandbox；`run_tests` 執行的專案程式碼、host user、未建模 executable 或外部程序仍可依 host 權限改寫 workspace。
@@ -546,4 +547,4 @@ alpha 才開始實作 Trust Tier 0/1/2 runtime；本紀錄中的 v0.9.x 工作�
   - Principal／scope、session authentication、workspace 外 user-owned grant store、decision matrix 分別屬 v0.9.5–v0.9.8；project policy 不暫代 grant。
   - Trust Tier 0/1/2 runtime 與 `council trust` 仍只屬 v1.0-alpha。
 - 文件影響：README、known issues、v0.9.x handoff、security／sandbox／orchestration deltas與本 learning log 更新；feature branch 不 bump version。
-- 下一步：完成 docs regression，sync deltas，strict validate，archive，再執行 post-archive `./scripts/check.sh`。
+- 下一步：archive `policy-trust-boundary`，再執行 post-archive `./scripts/check.sh`。
