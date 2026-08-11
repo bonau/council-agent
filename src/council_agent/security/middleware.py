@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import shlex
 import uuid
 from collections.abc import Callable
 from contextlib import contextmanager
@@ -22,10 +23,32 @@ from council_agent.security.authentication import (
     not_required_decision,
 )
 from council_agent.security.audit import AuditLogger, AuditRecord
-from council_agent.security.confirm import ConfirmationPolicy
+from council_agent.security.classifier import (
+    ClassificationResult,
+    CommandCategory,
+    classify_command,
+)
+from council_agent.security.confirm import (
+    ConfirmMode,
+    ConfirmationPolicy,
+)
+from council_agent.security.decision import (
+    ActionRisk,
+    AuthenticationState,
+    DecisionVector,
+    GrantState,
+    InteractionState,
+    PolicyState,
+    ScopeState,
+    TrustDecision,
+    TrustDecisionOutcome,
+    evaluate_decision,
+)
 from council_agent.security.policy import (
     CURRENT_POLICY_SCHEMA_VERSION,
     CouncilPolicy,
+    PolicyCommandReason,
+    evaluate_command,
 )
 from council_agent.security.principal import (
     AuthorizationReason,
@@ -428,12 +451,170 @@ def _register_tool(name: str, handler: ToolHandler) -> None:
     _TOOL_HANDLERS[name] = handler
 
 
+_ACTION_PRECONDITION_REASONS = frozenset(
+    {
+        "denied_path",
+        "shell_metachar",
+        "unparseable",
+        "unsupported",
+        "workspace_boundary",
+        "workspace_guard",
+    }
+)
+
+
+def _policy_state_for_action(
+    context: SecurityContext,
+    tool_name: str,
+    tool_args: dict[str, Any],
+    result: ToolResult,
+) -> PolicyState:
+    """Normalize project command policy without treating it as authority."""
+
+    policy_reason = result.metadata.get("policy_decision")
+    if policy_reason == PolicyCommandReason.DENIED.value:
+        return PolicyState.DENIED
+    if policy_reason == PolicyCommandReason.NOT_ALLOWED.value:
+        return PolicyState.NOT_ALLOWED
+
+    if tool_name != "run_command":
+        return PolicyState.ALLOWED
+    command = tool_args.get("command")
+    if not isinstance(command, str):
+        return PolicyState.ALLOWED
+    analysis = classify_command(command)
+    if not isinstance(analysis, ClassificationResult):
+        return PolicyState.ALLOWED
+    policy_decision = evaluate_command(shlex.join(analysis.argv), context.policy)
+    if policy_decision.reason is PolicyCommandReason.DENIED:
+        return PolicyState.DENIED
+    if policy_decision.reason is PolicyCommandReason.NOT_ALLOWED:
+        return PolicyState.NOT_ALLOWED
+    return PolicyState.ALLOWED
+
+
+def _scope_state(authorization: ScopeDecision) -> ScopeState:
+    if authorization.allowed:
+        return ScopeState.ALLOWED
+    try:
+        return ScopeState(authorization.reason.value)
+    except ValueError:
+        return ScopeState.PRINCIPAL_INVALID
+
+
+def _authentication_state(
+    authentication: AuthenticationDecision,
+) -> AuthenticationState:
+    if authentication.allowed:
+        if authentication.reason is AuthenticationReason.NOT_REQUIRED:
+            return AuthenticationState.NOT_REQUIRED
+        if authentication.reason in {
+            AuthenticationReason.AUTHENTICATED,
+            AuthenticationReason.STEP_UP_ALLOWED,
+        }:
+            return AuthenticationState.SATISFIED
+        return AuthenticationState.INVALID
+    try:
+        return AuthenticationState(authentication.reason.value)
+    except ValueError:
+        return AuthenticationState.INVALID
+
+
+def _action_risk(
+    tool_name: str,
+    tool_args: dict[str, Any],
+    result: ToolResult,
+) -> ActionRisk:
+    if result.metadata.get("rejection_reason") in _ACTION_PRECONDITION_REASONS:
+        return ActionRisk.UNRECOGNIZED
+    if tool_name in {"read_file", "list_dir"}:
+        return ActionRisk.READ
+    if tool_name in {"write_file", "delete_file", "run_tests"}:
+        return ActionRisk.MUTATE
+    if tool_name != "run_command":
+        return ActionRisk.UNRECOGNIZED
+
+    classification = result.metadata.get("classification")
+    if classification is None:
+        command = tool_args.get("command")
+        analysis = classify_command(command) if isinstance(command, str) else None
+        if isinstance(analysis, ClassificationResult):
+            classification = analysis.category.value
+    if classification == CommandCategory.READ.value:
+        return ActionRisk.READ
+    if classification == CommandCategory.WRITE.value:
+        return ActionRisk.MUTATE
+    if classification == CommandCategory.DANGEROUS.value:
+        return ActionRisk.HIGH_RISK
+    return ActionRisk.UNRECOGNIZED
+
+
+def _interaction_state(
+    policy: ConfirmationPolicy,
+    risk: ActionRisk,
+    result: ToolResult,
+) -> InteractionState:
+    if risk is ActionRisk.READ:
+        return InteractionState.NOT_REQUIRED
+
+    outcome = result.metadata.get("confirmation")
+    mapped = {
+        "auto": InteractionState.AUTO_APPROVED,
+        "approved": InteractionState.APPROVED,
+        "denied": InteractionState.DENIED,
+        "refused": InteractionState.REFUSED,
+        "compat_allow": InteractionState.COMPAT_ALLOW,
+    }.get(outcome)
+    if mapped is not None:
+        return mapped
+
+    if policy.mode is ConfirmMode.AUTO:
+        return InteractionState.AUTO_APPROVED
+    if policy.mode is ConfirmMode.ASK:
+        return InteractionState.PENDING
+    if policy.mode is ConfirmMode.REFUSE:
+        return InteractionState.REFUSED
+    if risk is ActionRisk.HIGH_RISK:
+        return InteractionState.REFUSED
+    return InteractionState.COMPAT_ALLOW
+
+
+def _runtime_trust_decision(
+    context: SecurityContext,
+    tool_name: str,
+    tool_args: dict[str, Any],
+    result: ToolResult,
+    authorization: ScopeDecision,
+    authentication: AuthenticationDecision,
+) -> TrustDecision:
+    """Translate current product gates into the v0.9.8 matrix contract."""
+
+    risk = _action_risk(tool_name, tool_args, result)
+    return evaluate_decision(
+        DecisionVector(
+            policy=_policy_state_for_action(
+                context,
+                tool_name,
+                tool_args,
+                result,
+            ),
+            scope=_scope_state(authorization),
+            authentication=_authentication_state(authentication),
+            # Persisted grants remain deliberately disconnected until v1.0-alpha.
+            grant=GrantState.NOT_REQUIRED,
+            risk=risk,
+            interaction=_interaction_state(context.confirmation, risk, result),
+        )
+    )
+
+
 def _correlation_metadata(
     context: SecurityContext,
     action_id: str,
     decision: str,
     authorization: ScopeDecision | None = None,
     authentication: AuthenticationDecision | None = None,
+    trust_decision: TrustDecision | None = None,
 ) -> dict[str, Any]:
     metadata: dict[str, Any] = {
         "request_id": context.request_id,
@@ -445,6 +626,8 @@ def _correlation_metadata(
         metadata["scope_authorization"] = authorization.to_metadata()
     if authentication is not None:
         metadata["session_authentication"] = authentication.to_metadata()
+    if trust_decision is not None:
+        metadata["trust_decision"] = trust_decision.to_metadata()
     if context.session_id is not None:
         metadata["session_id"] = context.session_id
     return metadata
@@ -457,19 +640,57 @@ def _with_correlation(
     decision: str,
     authorization: ScopeDecision | None = None,
     authentication: AuthenticationDecision | None = None,
+    *,
+    tool_name: str | None = None,
+    tool_args: dict[str, Any] | None = None,
 ) -> ToolResult:
+    trust_decision = None
+    normalized_metadata = dict(result.metadata)
+    effective_decision = decision
+    if (
+        tool_name is not None
+        and tool_args is not None
+        and authorization is not None
+        and authentication is not None
+    ):
+        trust_decision = _runtime_trust_decision(
+            context,
+            tool_name,
+            tool_args,
+            result,
+            authorization,
+            authentication,
+        )
+        if trust_decision.outcome is TrustDecisionOutcome.DENY:
+            effective_decision = TrustDecisionOutcome.DENY.value
+            if (
+                trust_decision.reason.value
+                != "action_risk_unrecognized"
+            ):
+                normalized_metadata["rejection_reason"] = (
+                    trust_decision.reason.value
+                )
+        elif (
+            trust_decision.outcome is TrustDecisionOutcome.REQUIRE_CONFIRMATION
+            and effective_decision != TrustDecisionOutcome.DENY.value
+        ):
+            effective_decision = TrustDecisionOutcome.REQUIRE_CONFIRMATION.value
+        elif effective_decision != TrustDecisionOutcome.DENY.value:
+            effective_decision = TrustDecisionOutcome.ALLOW.value
+
     return ToolResult(
         success=result.success,
         output=result.output,
         error=result.error,
         metadata={
-            **result.metadata,
+            **normalized_metadata,
             **_correlation_metadata(
                 context,
                 action_id,
-                decision,
+                effective_decision,
                 authorization,
                 authentication,
+                trust_decision,
             ),
         },
     )
@@ -608,6 +829,8 @@ def _finalize_evidence(
             "deny",
             authorization,
             authentication,
+            tool_name=tool,
+            tool_args=args,
         )
     return result
 
@@ -763,6 +986,8 @@ def invoke(tool_name: str, **tool_args: Any) -> ToolResult:
             "deny",
             authorization,
             authentication,
+            tool_name=tool_name,
+            tool_args=tool_args,
         )
 
     if not authorization.allowed:
@@ -773,6 +998,8 @@ def invoke(tool_name: str, **tool_args: Any) -> ToolResult:
             "deny",
             authorization,
             authentication,
+            tool_name=tool_name,
+            tool_args=tool_args,
         )
         return _finalize_evidence(
             context,
@@ -793,6 +1020,8 @@ def invoke(tool_name: str, **tool_args: Any) -> ToolResult:
             "deny",
             authorization,
             authentication,
+            tool_name=tool_name,
+            tool_args=tool_args,
         )
         return _finalize_evidence(
             context,
@@ -817,6 +1046,8 @@ def invoke(tool_name: str, **tool_args: Any) -> ToolResult:
             "deny",
             authorization,
             authentication,
+            tool_name=tool_name,
+            tool_args=tool_args,
         )
         return _finalize_evidence(
             context,
@@ -843,6 +1074,8 @@ def invoke(tool_name: str, **tool_args: Any) -> ToolResult:
             "deny",
             authorization,
             authentication,
+            tool_name=tool_name,
+            tool_args=tool_args,
         )
         return _finalize_evidence(
             context,
@@ -873,6 +1106,8 @@ def invoke(tool_name: str, **tool_args: Any) -> ToolResult:
         decision,
         authorization,
         authentication,
+        tool_name=tool_name,
+        tool_args=tool_args,
     )
     summary = context.tracker.record_result(tool_name, tool_args, result)
     if summary is None:
@@ -886,6 +1121,8 @@ def invoke(tool_name: str, **tool_args: Any) -> ToolResult:
             "deny",
             authorization,
             authentication,
+            tool_name=tool_name,
+            tool_args=tool_args,
         )
 
     return _finalize_evidence(
