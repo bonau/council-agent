@@ -378,3 +378,22 @@ alpha 才開始實作 Trust Tier 0/1/2 runtime；本紀錄中的 v0.9.x 工作�
 
 不得刪除舊紀錄來隱藏失敗；結論改變時新增一筆更正，並引用被更正的日期與問題 ID。
 
+## 執行紀錄
+
+### 2026-08-11 14:47 UTC — v1.0 準備文件初稿
+
+- 狀態：阻斷（完整 release gate 尚未通過；文件初稿已完成）
+- 基準：branch `cursor/major-release-prep-docs-a526`、commit `4a3f53c`、package v0.9.0、既有 active change `v1-prep`
+- 觀察：
+  - `uv run pytest`：182 passed。
+  - `validate --specs --strict`：orchestration、sandbox、security、tools 共 4 個 specs 通過。
+  - `validate --changes --strict`：工作開始前已存在的 `openspec/changes/v1-prep/` 只有 `.openspec.yaml`，change 不完整，因此失敗。
+- 矛盾或風險：發行 gate 要求無未完成 active change；目前 `v1-prep` 尚未形成 proposal、design、spec delta 與 tasks。此為流程阻斷，不把它誤記成產品 P0／P1 已修正。
+- 決策：保留既有 `v1-prep`，不在文件撰寫任務中擅自補寫、刪除或歸檔；兩份準備文件只記錄探索與 playbook。
+- 驗證：
+  - `./scripts/check.sh`：pytest 通過，changes strict validation 失敗，exit code 1。
+  - `npx @fission-ai/openspec@latest validate --specs --strict`：4 passed，exit code 0。
+  - evidence：本次 Agent 執行輸出；尚未建立 release evidence bundle。
+- 剩餘風險：`v1-prep` 未完成前，不得宣稱完整 release gate 通過，也不得進 alpha。
+- 文件影響：本紀錄明列阻斷；playbook 保持「tag 前不得有 active change」規則。
+- 下一步：由 `v1-prep` 擁有者完成或移除該 change 後，重新執行 `./scripts/check.sh`。
