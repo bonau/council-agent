@@ -25,7 +25,7 @@
 
 ## 5. Verification, spec sync, and archive readiness
 
-- [ ] 5.1 Run `uv run pytest` and record the final passing test count.
+- [x] 5.1 Run `uv run pytest` and record the final passing test count.
 - [ ] 5.2 Run `npx @fission-ai/openspec@latest validate --changes --strict`.
 - [ ] 5.3 Sync all security/sandbox/orchestration deltas to main specs and run `npx @fission-ai/openspec@latest validate --specs --strict`.
 - [ ] 5.4 Run `./scripts/check.sh` on the complete active change before archive and record the result; after all tasks are complete, archive the change and repeat the post-archive gate.
