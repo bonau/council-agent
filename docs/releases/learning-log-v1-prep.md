@@ -468,7 +468,7 @@ alpha 才開始實作 Trust Tier 0/1/2 runtime；本紀錄中的 v0.9.x 工作�
 
 ### 2026-08-11 17:26 UTC — v0.9.2 Policy Middleware 實作與 regression
 
-- 狀態：runtime／integration regression、OpenSpec sync 與 active-change gate 通過；archive／post-archive gate 待完成
+- 狀態：runtime／integration regression、OpenSpec sync／archive 與 active-change gate 通過；post-archive gate 待完成
 - 基準：branch `cursor/v092-policy-middleware-d691`、pre-archive implementation revision `884e278`、package v0.9.1、change `policy-middleware`
 - 原始旁路：
   - direct `tools.filesystem`／`tools.shell` 呼叫只執行 tool-local guard，沒有 wrapper-owned tracker、session、audit。
@@ -547,4 +547,5 @@ alpha 才開始實作 Trust Tier 0/1/2 runtime；本紀錄中的 v0.9.x 工作�
   - Principal／scope、session authentication、workspace 外 user-owned grant store、decision matrix 分別屬 v0.9.5–v0.9.8；project policy 不暫代 grant。
   - Trust Tier 0/1/2 runtime 與 `council trust` 仍只屬 v1.0-alpha。
 - 文件影響：README、known issues、v0.9.x handoff、security／sandbox／orchestration deltas與本 learning log 更新；feature branch 不 bump version。
-- 下一步：archive `policy-trust-boundary`，再執行 post-archive `./scripts/check.sh`。
+- Archive：17/17 tasks complete；delta 已同步；change 移至 `openspec/changes/archive/2026-08-11-policy-trust-boundary/`。
+- 下一步：執行 post-archive `./scripts/check.sh`。
