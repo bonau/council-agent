@@ -1,9 +1,9 @@
 ## 1. Principal and credential core
 
-- [ ] 1.1 Add immutable, strictly validated Council principal/kind/scope types, stable masked references, and strict scope parsing.
-- [ ] 1.2 Add a non-revealing typed OpenRouter provider credential that cannot be used as a Council principal.
-- [ ] 1.3 Add the pure cumulative tool/action scope matrix and stable allow/deny decision reasons, including shell category requirements.
-- [ ] 1.4 Add focused unit tests for valid/invalid principals, unknown scopes, masked identity stability, provider/principal type separation, and every scope-matrix row.
+- [x] 1.1 Add immutable, strictly validated Council principal/kind/scope types, stable masked references, and strict scope parsing.
+- [x] 1.2 Add a non-revealing typed OpenRouter provider credential that cannot be used as a Council principal.
+- [x] 1.3 Add the pure cumulative tool/action scope matrix and stable allow/deny decision reasons, including shell category requirements.
+- [x] 1.4 Add focused unit tests for valid/invalid principals, unknown scopes, masked identity stability, provider/principal type separation, and every scope-matrix row.
 - [ ] 1.5 Run `uv run pytest` and keep the full existing suite green before dispatcher integration.
 
 ## 2. Dispatcher authorization and evidence
