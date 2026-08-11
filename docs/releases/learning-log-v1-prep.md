@@ -421,3 +421,36 @@ alpha 才開始實作 Trust Tier 0/1/2 runtime；本紀錄中的 v0.9.x 工作�
 - 剩餘風險：v0.9.1 shell containment 未開工前，shell 越界與 classifier fail-open 仍在。
 - 文件影響：`openspec/specs/release-prep/spec.md` 成為來源真相之一。
 - 下一步：開 OpenSpec change `shell-containment`（目標 release v0.9.1），依 playbook 執行。
+
+### 2026-08-11 16:39 UTC — v0.9.1 shell-containment 實作與 regression
+
+- 狀態：實作與自動化 regression 通過；OpenSpec sync／archive 與 release branch 版本 bump 分開執行
+- 基準：branch `cursor/v091-shell-containment-d691`、runtime revision `65dcefd`、package v0.9.0、change `shell-containment`
+- 原始 bypass：
+  - 未知 executable 未命中 regex 時變成 `read`，再由 `shell=True` 執行。
+  - classifier 判斷 raw text，shell 可再解讀 `;`、pipeline、redirect、backtick、`$()`、環境變數與多命令。
+  - cwd 在 workspace 內不會阻止 `cat`／`python` 使用 absolute／traversal／symlink 路徑讀取外部 sentinel。
+  - `run_tests` 以 `args.split()` 拆 token，再用空白重組 shell command，空白路徑與 quoted values 會漂移。
+- 決策：
+  - 以 typed accepted／rejected analysis 建立一個 immutable argv、明確 category、非空 `matched_rule` 與 path operands；沒有 unknown-to-read fallback。
+  - raw input 先掃 shell control，再只做一次 `shlex.split(posix=True)`；接受後解析所有 path operands、建立 canonical policy 表示、套用 confirmation，最後把 retained argv 交給 `subprocess.run(..., shell=False)`。
+  - `run_tests` 保留原本 string `args` API，但 typed `path` 是單一 argv element，args 只解析一次；test action 明確分類為 `write`。
+- 明確拒絕：
+  - syntax：`;`、`|`、`&`、backtick、`$`、`(`、`)`、`<`、`>`、CR／LF（即使在 quotes 內）、NUL、unbalanced quoting。
+  - executable／form：未知與 path-qualified executable、`python`／`uv`／shell interpreters、未建模 command options、`mv`／`cp` target-directory forms。
+  - pytest args：未知 option、`--basetemp`／`--junitxml` 等未建模 path-writing options、shell control 與 malformed quoting。
+- 相容性影響：原本依賴任意 shell command、`python -c`、`uv run`、expansion、redirect、pipeline、command substitution、多命令或 raw spacing policy pattern 的 caller 會 fail-closed；pytest caller 應改用 `run_tests`。既有 classifier 測試因此更新為新 spec，而其他 regression 測試保持通過。
+- refusal contract：parser／containment 失敗回傳 `ToolResult(success=False)`；`metadata.rejection_reason` 為 `unsupported`、`unparseable`、`shell_metachar`、`workspace_boundary` 或 `denied_path`，pre-execution refusal 沒有 `exit_code`。
+- 驗證：
+  - pure analyzer／pytest args：89 passed，exit code 0。
+  - targeted shell／workspace／policy suite：95 passed，exit code 0。
+  - full regression：291 passed，exit code 0。
+  - `cat`／`python` outside sentinel、outside `cp`／`mv` destination、mixed operands、traversal、symlink、inherited environment 與 compound syntax全部斷言 sentinel 不變且 subprocess call count 為 0。
+  - `run_tests` 真實執行含空白、Unicode、引號、`;`、`$()` 與 backtick 的目錄：1 passed，exit code 0；quoted `-k` value 保持單一 argv element。
+  - 詳細 test／commit 對照見 [`v0.9.1-shell-containment-evidence.md`](v0.9.1-shell-containment-evidence.md)。
+- 剩餘風險／延期責任：
+  - 允許且通過現有 policy／confirmation 的 program 仍可自行存取網路、啟動 process 或解讀外部資源；沒有 OS、network、process-tree、environment／`PATH` isolation 或 TOCTOU 防護。
+  - 唯一 dispatcher／`SecurityContext` 仍由 v0.9.2 擁有；policy trust boundary、audit integrity、principal、authentication、grant、decision matrix 與 evidence closure 依 v0.9.3–v0.9.9 順序處理。
+  - Trust Tier 0/1/2 runtime 與 `council trust` 仍只屬 v1.0-alpha，未在本 change 實作。
+- 文件影響：README、known issues、v0.9.x handoff、smoke／manual status 與本 learning log 更新；未 bump package version。
+- 下一步：sync `security`／`tools` delta、strict validate、`./scripts/check.sh`、archive `shell-containment`，再交給 release branch 做版本 bump／tag。

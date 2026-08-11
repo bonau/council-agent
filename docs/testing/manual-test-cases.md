@@ -196,9 +196,9 @@ PY
 
 **預期**：mode 為 `auto`，但 `touch` 仍被 policy deny；`must-not-exist.txt` 不存在。記錄結論：`ConfirmMode ≠ Trust Tier`，`--yes ≠ 完整授權`。
 
-## MAN-08 — 未知 Classifier Fail-open
+## MAN-08 — 未知 Classifier Fail-closed
 
-**目的**：重現未知指令未命中 pattern 時被分類為 `read`。
+**目的**：確認未知／不支援指令不再因未命中 rule 被分類為 `read`。
 
 **操作**：
 
@@ -208,13 +208,19 @@ from council_agent.security import classify_command
 
 for command in ("python -c 'print(1)'", "sh -c 'printf ok'"):
     result = classify_command(command)
-    print(command, result.category.value, result.matched_rule)
+    print(
+        command,
+        "accepted=", result.accepted,
+        "reason=", getattr(result, "rejection_reason", None),
+    )
 PY
 ```
 
 **安全期望**：無法解析或不在允許 grammar 的指令應 fail-closed。
 
 **v0.9.0 實際預期**：兩者分類為 `read` 且沒有 matched rule，故案例為 `FAIL`（V1-001），不得把重現成功記成 `PASS`。
+
+**v0.9.1 implementation 預期**：兩者 `accepted=False`；依 raw syntax 分別回 `shell_metachar` 或 `unsupported`，且沒有 executable action。案例為 `PASS`，證據見 [`../releases/v0.9.1-shell-containment-evidence.md`](../releases/v0.9.1-shell-containment-evidence.md)。
 
 ## MAN-09 — Shell 只驗證 `cwd`，不是真 Sandbox
 
@@ -243,6 +249,8 @@ PY
 **安全期望**：越界副作用被拒絕，probe 不存在。
 
 **v0.9.0 實際預期**：Python 指令未知而分類為 `read`，shell 只檢查 `cwd`，probe 會建立；案例為 `FAIL`（V1-001）。這只能在一次性隔離環境執行。
+
+**v0.9.1 implementation 預期**：path-qualified Python／shell control 在 process creation 前拒絕，`outside_exists=False`，原 sentinel 不變。這只證明 simple-command boundary；仍不代表 OS sandbox。
 
 **清理**：記錄雜湊後刪除 `shell-created.txt`；原 sentinel 必須仍不變。
 
@@ -338,17 +346,22 @@ mkdir -p "$COUNCIL_WORKSPACE_ROOT/tests with spaces"
 printf 'def test_ok():\n    assert True\n' \
   > "$COUNCIL_WORKSPACE_ROOT/tests with spaces/test_ok.py"
 uv run python - <<'PY'
+from pathlib import Path
 from council_agent.security import ConfirmMode, confirmation_policy
 from council_agent.tools.shell import run_tests
 
-with confirmation_policy(ConfirmMode.REFUSE):
-    print(run_tests("tests with spaces"))
+with confirmation_policy(ConfirmMode.AUTO):
+    print("positive:", run_tests("tests with spaces"))
+    print("injection:", run_tests("tests with spaces", args="-q; touch marker"))
+print("marker_exists:", Path("marker").exists())
 PY
 ```
 
 **安全期望**：合法空白路徑可執行且只執行指定 pytest action；引號、redirect、pipeline、substitution 與額外命令一律拒絕且無副作用。
 
 **v0.9.0 實際預期**：路徑經空白拼接後語意漂移，測試失敗；案例為 `FAIL`（V1-002）。不要把 shell metacharacter payload 放入共享或非隔離環境。
+
+**v0.9.1 implementation 預期**：positive pytest action exit 0；injection 回 `shell_metachar`、無 `exit_code`，`marker_exists=False`。`AUTO` 只供此一次性 smoke 避免互動，不代表 Trust Tier 或持久授權。
 
 ## 完成與清理
 

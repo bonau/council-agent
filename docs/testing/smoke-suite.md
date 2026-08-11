@@ -1,6 +1,6 @@
 # v1.0 準備階段 Smoke Suite 設計
 
-> 基線：v0.9.0。狀態：草稿。此 suite 定義 SMK-00～SMK-08 與選配 LIVE-01；公開 beta 前所有必跑案例都必須 PASS，且所有 P0 必須關閉。
+> 已發佈基線：v0.9.0。狀態：草稿；v0.9.1 shell-containment implementation evidence 已補入。此 suite 定義 SMK-00～SMK-08 與選配 LIVE-01；公開 beta 前所有必跑案例都必須 PASS，且所有 P0 必須關閉。
 
 ## 判定原則
 
@@ -8,7 +8,7 @@
 - 「成功重現已知缺陷」仍是 `FAIL`，不能標為 PASS 或從分母移除。
 - 每個拒絕案例都驗證 exit code、reason、workspace diff 與 outside sentinel 無副作用。
 - 證據依 [`v1.0-beta-public-testing.md`](v1.0-beta-public-testing.md) 遮罩；audit 目前沒有可靠 secret redaction，禁止輸入真實秘密。
-- shell 目前只驗證 `cwd`，不是真 sandbox；所有案例須在一次性、非特權、無正式資料的環境執行。
+- v0.9.1 已加入 simple argv 與受支援 path-operand containment，但仍不是真 OS sandbox；所有案例須在一次性、非特權、無正式資料的環境執行。
 
 ## v0.9.0 預期結果
 
@@ -25,7 +25,16 @@
 | SMK-08 | Audit 顯示與完整性 | **FAIL（預期）** | 無可靠 redaction、sequence、gap 偵測與 hash chain，V1-005 |
 | LIVE-01 | 真實 provider 完整管線 | BLOCKED | P0 與離線案例未全過前不執行 |
 
-其中 **SMK-06 與 SMK-07 是目前明確的 shell boundary 預期失敗**。修正版本不得更新表格宣稱 PASS，必須用同一候選 commit 的實際 evidence 取代預期。
+其中 **SMK-06 與 SMK-07 是 v0.9.0 明確的 shell boundary 預期失敗**。修正版本不得只改表格宣稱 PASS，必須用同一候選 commit 的實際 evidence 取代預期。
+
+## v0.9.1 implementation evidence
+
+| ID | 結果 | Evidence |
+|---|---|---|
+| SMK-06 | PASS | unknown／malformed／compound refusal、canonical gate order、zero subprocess；見 [`v0.9.1-shell-containment-evidence.md`](../releases/v0.9.1-shell-containment-evidence.md) |
+| SMK-07 | PASS | path operands、outside sentinel、exact argv、special-path `run_tests` 與 args injection refusal；見 [`v0.9.1-shell-containment-evidence.md`](../releases/v0.9.1-shell-containment-evidence.md) |
+
+此結果關閉 V1-001／V1-002 的 implementation gate，不代表 v0.9.1 已完成 release branch 版本 bump／tag，也不解除 SMK-08、V1-003 或其餘 v0.9.x 阻斷。
 
 ## 共用環境與固定順序
 
@@ -147,13 +156,15 @@ council sandbox status --workspace "$COUNCIL_TEST_ROOT/workspace"
 **向量**：
 
 - 已知 dangerous：`curl`、`sudo`、`chmod`、遞迴／強制 `rm`；用 `REFUSE`，不得真的執行。
-- 已知 write：`touch`、`mkdir`、redirect。
+- 已知 write：`touch`、`mkdir`；redirect 屬不支援 shell syntax，必須拒絕。
 - 混合大小寫、前後空白、pipeline、substitution、額外命令。
 - 未知 executable 與 `python -c`／`sh -c`。
 
 **Release gate 斷言**：未知、無法解析、混淆及高風險組合一律拒絕；分類與實際執行是同一 canonical action。
 
 **v0.9.0 預期**：未知指令沒有 matched rule 時分類為 `read`，故 **FAIL（V1-001，shell boundary）**。
+
+**v0.9.1 implementation**：自動化 SMK-06 vectors PASS；unknown／path-qualified executable 與 shell interpreters 為 `unsupported`，compound syntax 為 `shell_metachar`，無 subprocess。證據見 [`v0.9.1-shell-containment-evidence.md`](../releases/v0.9.1-shell-containment-evidence.md)。
 
 ## SMK-07 — Shell Boundary 與 `run_tests` Quoting
 
@@ -174,6 +185,8 @@ council sandbox status --workspace "$COUNCIL_TEST_ROOT/workspace"
 - 不支援 shell grammar fail-closed，且沒有檔案、程序或網路副作用。
 
 **v0.9.0 預期**：shell 只驗證 `cwd`，不限制絕對路徑與子程序；`run_tests` 以空白重組 shell 字串。因此 **FAIL（V1-001／V1-002，shell boundary）**。
+
+**v0.9.1 implementation**：自動化 SMK-07 vectors PASS；受支援 path operands 越界前置拒絕，`run_tests` special path 真實通過，args injection 無 subprocess／marker。證據見 [`v0.9.1-shell-containment-evidence.md`](../releases/v0.9.1-shell-containment-evidence.md)。
 
 ## SMK-08 — Audit Show、Export、Redaction 與完整性
 
