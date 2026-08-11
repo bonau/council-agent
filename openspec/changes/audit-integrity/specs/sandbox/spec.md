@@ -44,6 +44,10 @@ The system SHALL reject direct access to security control-plane paths via a buil
 - **WHEN** a valid project policy omits protected paths or declares unrelated `denied_paths`
 - **THEN** all built-in control-plane protections remain active
 
+#### Scenario: Policy cannot remove its own protection
+- **WHEN** a valid project policy omits its own path or declares unrelated `denied_paths`
+- **THEN** built-in protection for every `council.policy.yaml` remains active
+
 #### Scenario: Listing parent directory allowed
 - **WHEN** `resolve()` is called with path `.` for `list_dir`
 - **THEN** it succeeds even if the directory contains denied entries such as `.env`, `.git`, `.council`, or `council.policy.yaml`
@@ -54,6 +58,14 @@ The system SHALL reject direct access to security control-plane paths via a buil
 
 ### Requirement: Session persistence for tool calls
 The system SHALL create a protected session directory `.council/sessions/<session-id>/` for each sandboxed `council run`. It SHALL write `meta.json` with sanitized prompt, preset, timestamps, and workspace root and append each tool invocation to `tools.jsonl` as one sanitized JSON object per line. Tool-call entries SHALL preserve middleware request/action identifiers and, when durable audit is active, the exact attempt and result event IDs.
+
+#### Scenario: Tool call logged
+- **WHEN** a tool is invoked during a run with an active session
+- **THEN** a sanitized JSON line is appended to that session's `tools.jsonl`
+
+#### Scenario: Session metadata written
+- **WHEN** a run starts with sandbox initialized
+- **THEN** sanitized `meta.json` is created with run metadata before tools execute
 
 #### Scenario: Tool call logged without secrets
 - **WHEN** a tool invocation contains a recognized secret in arguments, metadata, output, or error
