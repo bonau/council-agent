@@ -644,3 +644,49 @@ alpha 才開始實作 Trust Tier 0/1/2 runtime；本紀錄中的 v0.9.x 工作�
 - 基準：tag `v0.9.5`
 - 驗證：422 passed
 - 下一步：v0.9.6 session-auth
+
+### 2026-08-11 19:15 UTC — v0.9.6 session-auth implementation
+
+- 狀態：runtime、dispatcher、orchestrator／CLI、sandbox evidence、sync／archive與active/post-archive gate全部通過
+- 基準：branch `cursor/v096-session-auth-d691`、package v0.9.5、change `session-auth`
+- 原始邊界問題：
+  - Session UUID、request ID與local principal declaration只做correlation／authorization，不能證明fresh user/service authentication。
+  - Full scopes + `--yes`可通過confirmation，但沒有challenge、expiry、replay或principal/workspace/action binding，不能安全支撐high-risk step-up。
+  - 沒有authentication lifecycle reason/audit，未定義restart後outstanding proof行為。
+- 決策：
+  - `AuthenticationManager`以process-local memory保存challenge/token digest state與replay tombstone；challenge在credential compare前consume，token在freshness/binding compare前consume。
+  - Binding包含masked principal、canonical workspace hash、runtime session、`high-risk-action` purpose與exact top-level action hash。Challenge/response採typed `SecretStr` + HMAC；成功產生random opaque one-use token。
+  - Product orchestrator固定啟用high-risk step-up；scope要求`high-risk:manage`時，authentication位於scope後、policy/confirmation/handler前。Direct library context為相容性明確opt-in，不把default context宣稱authenticated。
+  - `COUNCIL_AUTH_SECRET`是獨立service/test verifier input；不提供command-line secret option。`--yes`只改confirmation mode，無verifier仍`authentication_missing`。
+  - Restart建立新manager，舊challenge/token因無state而invalid；run cleanup立即revoke。Persistent cross-restart revoke/store仍由v0.9.7負責。
+- Authentication evidence：
+  - Stable reasons涵蓋missing、invalid、failed、expired、revoked、replay、binding mismatch、provider error與step-up allow。
+  - Schema-v1 administrative `session_auth` event涵蓋success/failure/expiry/revocation/replay；tool/session metadata保存masked normalized decision。
+  - Durable matrix實際斷言raw verifier、challenge ID、nonce、HMAC response、token不在audit；sandbox session與CLI console同樣不含credential。
+- 旁路／無副作用：
+  - Direct與Crew missing proof皆在handler/process前拒絕；`--yes` only sandbox marker保留。
+  - Wrong principal/workspace/session/purpose/action、expired、revoked、replayed proof全部process call count 0。
+  - Binding mismatch或failed challenge後改用正確資料只得到replay，不能retry同一proof。
+  - Fresh authentication不覆蓋project policy deny或confirmation refuse。
+- 漸進驗證：
+  - Authentication primitives：15 passed；phase-1 full 437 passed。
+  - Dispatcher targeted：46 passed；compatibility targeted 81 passed；full 449 passed。
+  - Orchestrator／CLI targeted：29 passed；full 456 passed。
+  - Full-story auth targeted：37 passed；current full regression 459 passed。
+  - Active-change `./scripts/check.sh`：459 passed；change 1/1、main specs 5/5 strict passed。
+  - Post-archive `./scripts/check.sh`：459 passed；active changes 0、main specs 5/5 strict passed。
+  - 詳細evidence：[`v0.9.6-session-auth-evidence.md`](v0.9.6-session-auth-evidence.md)。
+- 剩餘風險／延期責任：
+  - Process-local manager不是workspace外 user-owned persistent verifier/grant/revoke store；v0.9.7負責ownership、atomic update與cross-restart revoke。
+  - Authentication requirement不是Trust Tier matrix；v0.9.8定義precedence，runtime仍停止於v1.0-alpha。
+  - Hostile in-process Python、host owner/root、project test code、OS/process/network isolation不在本版。
+- 文件影響：README、`.env.example`、known issues、v0.9.x handoff、security/sandbox/orchestration delta與本learning log；feature branch不bump package version。
+- Archive：25/25 tasks complete；delta已同步；change移至`openspec/changes/archive/2026-08-11-session-auth/`。
+- 下一步：合併feature PR；之後只在`release/0.9.6`做版本bump／tag。下一個清債change是v0.9.7 `trust-grant-store`。
+
+### 2026-08-11 18:59 UTC — v0.9.6 tagged
+
+- 狀態：通過
+- 基準：tag `v0.9.6`
+- 驗證：459 passed
+- 下一步：v0.9.7 trust-grant-store

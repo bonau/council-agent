@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+import uuid
 from pathlib import Path
 
 from crewai import Agent, Crew, Process, Task
+from pydantic import SecretStr
 
 from council_agent.config.presets import Preset, get_effective_max_tool_calls
 from council_agent.config.settings import get_settings
@@ -17,12 +19,15 @@ from council_agent.sandbox.config import is_sandbox_initialized
 from council_agent.sandbox.session import SessionManager
 from council_agent.security import (
     AuditLogger,
+    AuthenticationManager,
     ConfirmFn,
     ConfirmMode,
     ConfirmationPolicy,
     Principal,
     PrincipalResolver,
     SecurityContext,
+    ServiceStepUpProvider,
+    authentication_audit_sink,
     default_audit_events_path,
     load_policy_file,
     security_context,
@@ -154,6 +159,7 @@ def run_council(
     confirm_mode: ConfirmMode = ConfirmMode.COMPAT,
     confirm_fn: ConfirmFn | None = None,
     principal_resolver: PrincipalResolver | None = None,
+    authentication_verifier: SecretStr | None = None,
 ) -> CouncilResult:
     """Run the full three-phase council pipeline with optional escalation."""
     if not isinstance(provider_credential, OpenRouterCredential):
@@ -164,6 +170,11 @@ def run_council(
         principal.__post_init__()
     except ValueError as exc:
         raise ValueError("principal is invalid") from exc
+    if authentication_verifier is not None:
+        if not isinstance(authentication_verifier, SecretStr):
+            raise TypeError("authentication_verifier must be a SecretStr")
+        if not authentication_verifier.get_secret_value():
+            raise ValueError("authentication_verifier must be non-empty")
 
     settings = get_settings()
     workspace_root = Path(settings.council_workspace_root).resolve()
@@ -190,30 +201,54 @@ def run_council(
         )
 
     tracker = ToolCallTracker(max_tool_calls=get_effective_max_tool_calls(preset))
+    request_id = str(uuid.uuid4())
+    runtime_session_id = (
+        session.meta.session_id if session is not None else str(uuid.uuid4())
+    )
 
     audit_logger = None
     if session is not None and session_project is not None:
         audit_logger = AuditLogger(
             default_audit_events_path(session_project),
-            session_id=session.meta.session_id,
+            session_id=runtime_session_id,
         )
 
-    context = SecurityContext.create(
-        workspace_root,
-        policy=loaded_policy,
-        confirmation=ConfirmationPolicy(
-            mode=confirm_mode,
-            confirm_fn=confirm_fn,
-        ),
-        tracker=tracker,
-        principal=principal,
-        principal_resolver=principal_resolver,
-        session=session,
-        audit_logger=audit_logger,
-    )
+    authentication_manager = None
+    step_up_provider = None
+    if authentication_verifier is not None:
+        authentication_manager = AuthenticationManager(
+            authentication_verifier,
+            event_sink=authentication_audit_sink(
+                audit_logger,
+                request_id=request_id,
+                session_id=runtime_session_id,
+            ),
+        )
+        step_up_provider = ServiceStepUpProvider(
+            authentication_manager,
+            authentication_verifier,
+        )
 
     session_status = "completed"
     try:
+        context = SecurityContext.create(
+            workspace_root,
+            request_id=request_id,
+            session_id=runtime_session_id,
+            policy=loaded_policy,
+            confirmation=ConfirmationPolicy(
+                mode=confirm_mode,
+                confirm_fn=confirm_fn,
+            ),
+            tracker=tracker,
+            principal=principal,
+            principal_resolver=principal_resolver,
+            authentication_manager=authentication_manager,
+            step_up_provider=step_up_provider,
+            require_high_risk_step_up=True,
+            session=session,
+            audit_logger=audit_logger,
+        )
         with security_context(context):
             planning_crew = build_planning_crew(preset, provider_credential)
             execution_crew = build_execution_crew(
@@ -269,6 +304,8 @@ def run_council(
         session_status = "failed"
         raise
     finally:
+        if authentication_manager is not None:
+            authentication_manager.revoke()
         if session is not None:
             # Keep count in sync if tools logged via tracker but finalize late.
             session.meta.tool_call_count = max(

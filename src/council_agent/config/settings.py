@@ -34,6 +34,10 @@ class Settings(BaseSettings):
         "read,filesystem:mutate,test,shell,high-risk:manage",
         alias="COUNCIL_PRINCIPAL_SCOPES",
     )
+    council_auth_secret: SecretStr | None = Field(
+        None,
+        alias="COUNCIL_AUTH_SECRET",
+    )
     presets_dir: Path = Field(default=PRESETS_DIR)
 
 
