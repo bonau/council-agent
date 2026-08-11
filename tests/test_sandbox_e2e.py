@@ -18,6 +18,7 @@ from council_agent.sandbox.session import SessionManager
 from council_agent.sandbox.workspace import get_workspace_guard
 from council_agent.security import full_scope_principal, without_security_context
 from council_agent.types import (
+    CouncilStopReason,
     PlanArtifact,
     VerdictStatus,
     VerificationVerdict,
@@ -309,3 +310,166 @@ def test_orchestrator_accepts_explicit_credential_and_principal_positionally(
     assert result.final_output == "ok"
     assert "tracker" not in mock_exec_build.call_args.kwargs
     assert "session" not in mock_exec_build.call_args.kwargs
+
+
+def test_escalation_attempts_retain_correlated_sandbox_evidence(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from council_agent.security import load_audit_events
+    from council_agent.security.audit import default_audit_events_path
+
+    monkeypatch.setenv("OPENROUTER_API_KEY", "test-key")
+    get_settings.cache_clear()
+    get_workspace_guard.cache_clear()
+    init_sandbox(tmp_path)
+    apply_workspace_root(tmp_path)
+    monkeypatch.chdir(tmp_path)
+
+    preset = get_preset_by_name(PRESETS_DIR, "glm-stack")
+    plan = PlanArtifact(
+        raw="{}",
+        steps=["Use write_file to create final.txt"],
+        success_criteria=["write_file evidence belongs to the final attempt"],
+        risks=[],
+    )
+    tools = {tool.name: tool for tool in build_execution_tools()}
+    initial_crew = MagicMock()
+    escalation_crew = MagicMock()
+    verification_crew = MagicMock()
+
+    def _initial(**_kwargs):
+        tools["write_file"].run(path="initial.txt", content="initial")
+        return MagicMock(raw="initial result")
+
+    def _escalate(**_kwargs):
+        tools["write_file"].run(path="final.txt", content="corrected")
+        return MagicMock(raw="corrected result")
+
+    initial_crew.kickoff.side_effect = _initial
+    escalation_crew.kickoff.side_effect = _escalate
+    verification_crew.kickoff.side_effect = [
+        MagicMock(
+            raw='{"status":"FAIL","summary":"retry","issues":["not final"]}'
+        ),
+        MagicMock(raw='{"status":"PASS","summary":"ok","issues":[]}'),
+    ]
+
+    with (
+        patch(
+            "council_agent.orchestrator.build_planning_crew",
+            return_value=MagicMock(),
+        ),
+        patch(
+            "council_agent.orchestrator.run_planning",
+            return_value=plan,
+        ),
+        patch(
+            "council_agent.orchestrator.build_execution_crew",
+            return_value=initial_crew,
+        ),
+        patch(
+            "council_agent.orchestrator.build_verification_crew",
+            return_value=verification_crew,
+        ),
+        patch(
+            "council_agent.orchestrator.build_escalation_crew",
+            return_value=escalation_crew,
+        ),
+    ):
+        result = run_council(
+            "Use write_file to create final.txt",
+            preset,
+            PROVIDER_CREDENTIAL,
+            TEST_PRINCIPAL,
+            project_root=tmp_path,
+        )
+
+    assert result.verdict.status is VerdictStatus.PASS
+    assert result.stop_reason is CouncilStopReason.PASSED
+    assert result.final_output == "corrected result"
+    assert len(result.attempts) == 2
+    assert result.attempts[0].verdict.status is VerdictStatus.FAIL
+    assert result.final_attempt_id == result.attempts[1].attempt_id
+    for attempt in result.attempts:
+        assert len(attempt.execution.tool_summaries) == 1
+        summary = attempt.execution.tool_summaries[0]
+        assert summary.metadata["pipeline_attempt_id"] == attempt.attempt_id
+
+    session = SessionManager.latest(tmp_path)
+    assert session is not None
+    session_lines = [
+        json.loads(line)
+        for line in session.tools_path.read_text(encoding="utf-8").splitlines()
+    ]
+    assert [line["pipeline_attempt_id"] for line in session_lines] == [
+        result.attempts[0].attempt_id,
+        result.attempts[1].attempt_id,
+    ]
+    events = load_audit_events(default_audit_events_path(tmp_path))
+    assert [
+        event.metadata["pipeline_attempt_id"] for event in events
+    ] == [
+        result.attempts[0].attempt_id,
+        result.attempts[0].attempt_id,
+        result.attempts[1].attempt_id,
+        result.attempts[1].attempt_id,
+    ]
+
+
+def test_sandbox_run_cannot_pass_without_required_test_evidence(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("OPENROUTER_API_KEY", "test-key")
+    get_settings.cache_clear()
+    get_workspace_guard.cache_clear()
+    init_sandbox(tmp_path)
+    apply_workspace_root(tmp_path)
+    monkeypatch.chdir(tmp_path)
+
+    preset = get_preset_by_name(PRESETS_DIR, "glm-stack").model_copy(
+        update={"max_retries": 0}
+    )
+    plan = PlanArtifact(
+        raw="{}",
+        steps=["run pytest"],
+        success_criteria=["all tests pass"],
+        risks=[],
+    )
+    execution_crew = MagicMock()
+    execution_crew.kickoff.return_value = MagicMock(raw="tests pass")
+    verification_crew = MagicMock()
+    verification_crew.kickoff.return_value = MagicMock(
+        raw='{"status":"PASS","summary":"claimed","issues":[]}'
+    )
+
+    with (
+        patch(
+            "council_agent.orchestrator.build_planning_crew",
+            return_value=MagicMock(),
+        ),
+        patch(
+            "council_agent.orchestrator.run_planning",
+            return_value=plan,
+        ),
+        patch(
+            "council_agent.orchestrator.build_execution_crew",
+            return_value=execution_crew,
+        ),
+        patch(
+            "council_agent.orchestrator.build_verification_crew",
+            return_value=verification_crew,
+        ),
+    ):
+        result = run_council(
+            "Run pytest and ensure tests pass",
+            preset,
+            PROVIDER_CREDENTIAL,
+            TEST_PRINCIPAL,
+            project_root=tmp_path,
+        )
+
+    assert result.verdict.status is VerdictStatus.FAIL
+    assert result.stop_reason is CouncilStopReason.RETRIES_DISABLED
+    assert "Required tool evidence is missing: run_tests" in result.verdict.issues

@@ -72,7 +72,13 @@ def run_execution(
     plan: PlanArtifact,
     *,
     tracker: ToolCallTracker | None = None,
+    attempt_id: str | None = None,
 ) -> ExecutionResult:
+    summary_offset = (
+        len(tracker.summaries)
+        if tracker is not None and attempt_id is not None
+        else 0
+    )
     sections = _format_plan_sections(plan)
     result = crew.kickoff(
         inputs={
@@ -81,5 +87,11 @@ def run_execution(
             "success_criteria": sections["success_criteria"],
         }
     )
-    summaries = list(tracker.summaries) if tracker is not None else []
-    return ExecutionResult(raw=crew_output_text(result), tool_summaries=summaries)
+    summaries = (
+        list(tracker.summaries[summary_offset:]) if tracker is not None else []
+    )
+    return ExecutionResult(
+        raw=crew_output_text(result),
+        tool_summaries=summaries,
+        attempt_id=attempt_id,
+    )

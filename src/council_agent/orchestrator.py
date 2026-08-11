@@ -12,6 +12,7 @@ from council_agent.config.presets import Preset, get_effective_max_tool_calls
 from council_agent.config.settings import get_settings
 from council_agent.crews.base import crew_output_text
 from council_agent.crews.execution import build_execution_crew, run_execution
+from council_agent.crews.execution_tools import build_execution_tools
 from council_agent.crews.planning import build_planning_crew, run_planning
 from council_agent.crews.verification import build_verification_crew, run_verification
 from council_agent.llm.openrouter import OpenRouterCredential, make_llm
@@ -30,11 +31,15 @@ from council_agent.security import (
     authentication_audit_sink,
     default_audit_events_path,
     load_policy_file,
+    pipeline_attempt,
     security_context,
 )
 from council_agent.tools import ToolCallTracker
 from council_agent.types import (
+    AttemptKind,
+    CouncilAttempt,
     CouncilResult,
+    CouncilStopReason,
     ExecutionResult,
     PlanArtifact,
     VerdictStatus,
@@ -112,13 +117,17 @@ def _resolve_policy_root(
 def build_escalation_crew(
     preset: Preset,
     provider_credential: OpenRouterCredential,
+    *,
+    enable_tools: bool = True,
 ) -> Crew:
     role = preset.escalation
+    tools = build_execution_tools() if enable_tools else []
     agent = Agent(
         role="Escalation Specialist",
         goal="Resolve difficult issues and deliver a corrected result",
         backstory=ESCALATION_BACKSTORY,
         llm=make_llm(role.model, role.temperature, provider_credential),
+        tools=tools,
         verbose=False,
     )
     task = Task(
@@ -135,7 +144,11 @@ def run_escalation(
     plan: PlanArtifact,
     execution: ExecutionResult,
     verdict: VerificationVerdict,
+    *,
+    tracker: ToolCallTracker | None = None,
+    attempt_id: str | None = None,
 ) -> ExecutionResult:
+    summary_offset = len(tracker.summaries) if tracker is not None else 0
     result = crew.kickoff(
         inputs={
             "prompt": prompt,
@@ -145,7 +158,25 @@ def run_escalation(
             "summary": verdict.summary,
         }
     )
-    return ExecutionResult(raw=crew_output_text(result))
+    summaries = (
+        list(tracker.summaries[summary_offset:]) if tracker is not None else []
+    )
+    return ExecutionResult(
+        raw=crew_output_text(result),
+        tool_summaries=summaries,
+        attempt_id=attempt_id,
+    )
+
+
+def _bind_attempt(
+    execution: ExecutionResult,
+    attempt_id: str,
+) -> ExecutionResult:
+    """Normalize patched/legacy runners while rejecting conflicting evidence."""
+    if execution.attempt_id not in {None, attempt_id}:
+        raise ValueError("execution returned a conflicting pipeline attempt ID")
+    execution.attempt_id = attempt_id
+    return execution
 
 
 def run_council(
@@ -266,39 +297,97 @@ def run_council(
                 verification_crew.verbose = True
 
             plan = run_planning(planning_crew, prompt)
-            execution = run_execution(
-                execution_crew, prompt, plan, tracker=tracker
-            )
-            verdict = run_verification(
-                verification_crew,
-                prompt,
-                plan,
-                execution,
-            )
-
-            escalated = False
-            final_output = execution.raw
-
-            if verdict.status == VerdictStatus.FAIL and preset.max_retries > 0:
-                escalation_crew = build_escalation_crew(
-                    preset,
-                    provider_credential,
+            attempts: list[CouncilAttempt] = []
+            initial_attempt_id = str(uuid.uuid4())
+            with pipeline_attempt(initial_attempt_id):
+                execution = _bind_attempt(
+                    run_execution(
+                        execution_crew,
+                        prompt,
+                        plan,
+                        tracker=tracker,
+                        attempt_id=initial_attempt_id,
+                    ),
+                    initial_attempt_id,
                 )
-                if verbose:
-                    escalation_crew.verbose = True
-                execution = run_escalation(
-                    escalation_crew, prompt, plan, execution, verdict
+                verdict = run_verification(
+                    verification_crew,
+                    prompt,
+                    plan,
+                    execution,
                 )
-                escalated = True
-                final_output = execution.raw
+            attempts.append(
+                CouncilAttempt(
+                    attempt_id=initial_attempt_id,
+                    sequence=1,
+                    kind=AttemptKind.INITIAL,
+                    execution=execution,
+                    verdict=verdict,
+                )
+            )
 
+            escalation_crew = None
+            retries = 0
+            while (
+                verdict.status == VerdictStatus.FAIL
+                and retries < preset.max_retries
+            ):
+                if escalation_crew is None:
+                    escalation_crew = build_escalation_crew(
+                        preset,
+                        provider_credential,
+                    )
+                    if verbose:
+                        escalation_crew.verbose = True
+                retries += 1
+                attempt_id = str(uuid.uuid4())
+                with pipeline_attempt(attempt_id):
+                    execution = _bind_attempt(
+                        run_escalation(
+                            escalation_crew,
+                            prompt,
+                            plan,
+                            execution,
+                            verdict,
+                            tracker=tracker,
+                            attempt_id=attempt_id,
+                        ),
+                        attempt_id,
+                    )
+                    verdict = run_verification(
+                        verification_crew,
+                        prompt,
+                        plan,
+                        execution,
+                    )
+                attempts.append(
+                    CouncilAttempt(
+                        attempt_id=attempt_id,
+                        sequence=len(attempts) + 1,
+                        kind=AttemptKind.ESCALATION,
+                        execution=execution,
+                        verdict=verdict,
+                    )
+                )
+
+            if verdict.status is VerdictStatus.PASS:
+                stop_reason = CouncilStopReason.PASSED
+            elif preset.max_retries == 0:
+                stop_reason = CouncilStopReason.RETRIES_DISABLED
+            else:
+                stop_reason = CouncilStopReason.RETRIES_EXHAUSTED
+
+            final_attempt = attempts[-1]
             return CouncilResult(
                 prompt=prompt,
                 plan=plan,
-                execution=execution,
-                verdict=verdict,
-                escalated=escalated,
-                final_output=final_output,
+                execution=final_attempt.execution,
+                verdict=final_attempt.verdict,
+                escalated=len(attempts) > 1,
+                final_output=final_attempt.execution.raw,
+                attempts=attempts,
+                final_attempt_id=final_attempt.attempt_id,
+                stop_reason=stop_reason,
             )
     except Exception:
         session_status = "failed"
