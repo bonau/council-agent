@@ -27,11 +27,11 @@
 - [x] 3.3 Update `docs/releases/v1.0-alpha-known-issues.md` for V1-001／V1-002 only after linking positive, refusal, bypass, external-sentinel, and smoke evidence; retain explicit remaining containment limitations and do not imply Trust Tier or unified middleware exists.
 - [x] 3.4 Append `docs/releases/learning-log-v1-prep.md` with the original bypasses, chosen canonical action model, rejected syntax/option list, compatibility impact, refusal metadata, external-sentinel and exit evidence, whitespace/special-path `run_tests` smoke results, and deferred ownership.
 - [x] 3.5 Update `docs/releases/v0.9.x-handoff.md` and relevant release evidence/status references for v0.9.1, while keeping v0.9.2 dispatcher work and v1.0 Trust Tier runtime explicitly pending.
-- [ ] 3.6 Run `uv run pytest` after documentation updates and keep the full suite green before final verification.
+- [x] 3.6 Run `uv run pytest` after documentation updates and keep the full suite green before final verification.
 
 ## 4. Verification and OpenSpec completion
 
-- [ ] 4.1 Run `uv run pytest` and record the full passing test count plus the positive, refusal, no-side-effect, and `run_tests` whitespace-path evidence.
+- [x] 4.1 Run `uv run pytest` and record the full passing test count plus the positive, refusal, no-side-effect, and `run_tests` whitespace-path evidence.
 - [ ] 4.2 Run `npx @fission-ai/openspec@latest validate --changes --strict` and resolve every active-change validation error.
 - [ ] 4.3 Sync the `security` and `tools` deltas into `openspec/specs/`, then run `npx @fission-ai/openspec@latest validate --specs --strict` and resolve every main-spec validation error.
 - [ ] 4.4 Run `./scripts/check.sh` as the final combined gate and confirm pytest plus both strict OpenSpec validation modes pass on the same revision.
