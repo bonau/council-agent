@@ -455,4 +455,5 @@ alpha 才開始實作 Trust Tier 0/1/2 runtime；本紀錄中的 v0.9.x 工作�
   - 唯一 dispatcher／`SecurityContext` 仍由 v0.9.2 擁有；policy trust boundary、audit integrity、principal、authentication、grant、decision matrix 與 evidence closure 依 v0.9.3–v0.9.9 順序處理。
   - Trust Tier 0/1/2 runtime 與 `council trust` 仍只屬 v1.0-alpha，未在本 change 實作。
 - 文件影響：README、known issues、v0.9.x handoff、smoke／manual status 與本 learning log 更新；未 bump package version。
-- 下一步：sync `security`／`tools` delta、strict validate、`./scripts/check.sh`、archive `shell-containment`，再交給 release branch 做版本 bump／tag。
+- Archive：delta 已同步，change 移至 `openspec/changes/archive/2026-08-11-shell-containment/`；tasks 28/28 complete，無 active `shell-containment` delta。
+- 下一步：合併 feature PR；之後只在 `release/0.9.1` 做版本 bump／tag。

@@ -36,4 +36,4 @@
 - [x] 4.3 Sync the `security` and `tools` deltas into `openspec/specs/`, then run `npx @fission-ai/openspec@latest validate --specs --strict` and resolve every main-spec validation error.
 - [x] 4.4 Run `./scripts/check.sh` as the final combined gate and confirm pytest plus both strict OpenSpec validation modes pass on the same revision.
 - [x] 4.5 Review the diff to confirm the v0.9.1 change contains no Trust Tier, `council trust`, unified dispatcher／`SecurityContext`, OS containment, release-version bump, or unrelated v0.9.x work.
-- [ ] 4.6 Archive `shell-containment` only after all tasks and evidence are complete, and verify no active delta from this change remains.
+- [x] 4.6 Archive `shell-containment` only after all tasks and evidence are complete, and verify no active delta from this change remains.
