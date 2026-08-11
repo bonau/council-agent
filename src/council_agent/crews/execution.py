@@ -74,7 +74,11 @@ def run_execution(
     tracker: ToolCallTracker | None = None,
     attempt_id: str | None = None,
 ) -> ExecutionResult:
-    summary_offset = len(tracker.summaries) if tracker is not None else 0
+    summary_offset = (
+        len(tracker.summaries)
+        if tracker is not None and attempt_id is not None
+        else 0
+    )
     sections = _format_plan_sections(plan)
     result = crew.kickoff(
         inputs={
