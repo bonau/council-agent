@@ -234,7 +234,6 @@ def _run_command(
     *,
     command: str,
     cwd: str | None = None,
-    *,
     timeout_sec: int = 120,
 ) -> ToolResult:
     context.validate(require_active=True)
@@ -279,7 +278,6 @@ def _run_tests(
     *,
     path: str = ".",
     args: str = "",
-    *,
     timeout_sec: int = 120,
 ) -> ToolResult:
     context.validate(require_active=True)
