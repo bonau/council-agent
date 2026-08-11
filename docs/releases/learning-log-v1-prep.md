@@ -693,7 +693,7 @@ alpha 才開始實作 Trust Tier 0/1/2 runtime；本紀錄中的 v0.9.x 工作�
 
 ### 2026-08-11 20:25 UTC — v0.9.7 trust-grant-store implementation
 
-- 狀態：store core、authenticated management、CLI 與 progressive regression 通過；OpenSpec sync／archive 與 final gate 待完成
+- 狀態：store core、authenticated management、CLI、OpenSpec sync／archive與active/post-archive gate全部通過
 - 基準：branch `cursor/v097-trust-grant-store-d691`、package metadata 不 bump、change `trust-grant-store`
 - 原始邊界問題：
   - v0.9.6 `AuthenticationManager` 與 principal resolver 都是 process-local seam；沒有 workspace 外、cross-restart persistent grant/revoke state。
@@ -717,6 +717,8 @@ alpha 才開始實作 Trust Tier 0/1/2 runtime；本紀錄中的 v0.9.x 工作�
   - Store core focused 25 passed；phase-1 full 484 passed。
   - Authentication/audit core+management focused 32 passed；phase-2 full 491 passed。
   - CLI focused 7 passed；phase-3 full 498 passed。
+  - Active-change `./scripts/check.sh`：498 passed；change 1/1、main specs 5/5 strict passed。
+  - Post-archive `./scripts/check.sh`：498 passed；active changes 0、main specs 5/5 strict passed。
   - 詳細 evidence：[`v0.9.7-trust-grant-store-evidence.md`](v0.9.7-trust-grant-store-evidence.md)。
 - Recovery／相容：
   - Offline validation-only path不建立、鎖定、修復、truncate、migrate或rewrite candidate。Restore須停 process、保留current audit/state、維持`0700/0600`、比較revision並保存所有較新 revoke；schema downgrade/future version拒絕。
@@ -726,4 +728,5 @@ alpha 才開始實作 Trust Tier 0/1/2 runtime；本紀錄中的 v0.9.x 工作�
   - Trust Tier 0/1/2、`--trust-tier`與 grant 消費接線只屬 v1.0-alpha；遠端同步／team IAM／anti-rollback anchor不在本版。
   - Feature branch不 bump package version或tag；只可在後續`release/0.9.7`處理。
 - 文件影響：known issues關閉V1-008的store scope、handoff新增v0.9.7狀態、security/orchestration deltas與本learning log；不宣稱完整Trust Tier。
-- 下一步：完成active-change `check.sh`、sync/validate、archive與post-archive `check.sh`，再回填final count/path。
+- Archive：25/25 tasks complete；security/orchestration delta已同步；change移至`openspec/changes/archive/2026-08-11-trust-grant-store/`。
+- 下一步：合併feature PR；之後只在`release/0.9.7`做版本 bump／tag。下一個清債change是v0.9.8 `trust-decision-matrix`，仍不得啟用Trust Tier runtime。
