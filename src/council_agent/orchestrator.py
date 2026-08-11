@@ -12,7 +12,7 @@ from council_agent.crews.base import crew_output_text
 from council_agent.crews.execution import build_execution_crew, run_execution
 from council_agent.crews.planning import build_planning_crew, run_planning
 from council_agent.crews.verification import build_verification_crew, run_verification
-from council_agent.llm.openrouter import make_llm
+from council_agent.llm.openrouter import OpenRouterCredential, make_llm
 from council_agent.sandbox.config import is_sandbox_initialized
 from council_agent.sandbox.session import SessionManager
 from council_agent.security import (
@@ -20,6 +20,8 @@ from council_agent.security import (
     ConfirmFn,
     ConfirmMode,
     ConfirmationPolicy,
+    Principal,
+    PrincipalResolver,
     SecurityContext,
     default_audit_events_path,
     load_policy_file,
@@ -102,13 +104,16 @@ def _resolve_policy_root(
     return Path(workspace_root).expanduser().resolve()
 
 
-def build_escalation_crew(preset: Preset, api_key: str) -> Crew:
+def build_escalation_crew(
+    preset: Preset,
+    provider_credential: OpenRouterCredential,
+) -> Crew:
     role = preset.escalation
     agent = Agent(
         role="Escalation Specialist",
         goal="Resolve difficult issues and deliver a corrected result",
         backstory=ESCALATION_BACKSTORY,
-        llm=make_llm(role.model, role.temperature, api_key),
+        llm=make_llm(role.model, role.temperature, provider_credential),
         verbose=False,
     )
     task = Task(
@@ -141,14 +146,25 @@ def run_escalation(
 def run_council(
     prompt: str,
     preset: Preset,
-    api_key: str,
+    provider_credential: OpenRouterCredential,
+    principal: Principal,
     *,
     verbose: bool = False,
     project_root: Path | str | None = None,
     confirm_mode: ConfirmMode = ConfirmMode.COMPAT,
     confirm_fn: ConfirmFn | None = None,
+    principal_resolver: PrincipalResolver | None = None,
 ) -> CouncilResult:
     """Run the full three-phase council pipeline with optional escalation."""
+    if not isinstance(provider_credential, OpenRouterCredential):
+        raise TypeError("provider_credential must be an OpenRouterCredential")
+    if not isinstance(principal, Principal):
+        raise TypeError("principal must be a Council Principal")
+    try:
+        principal.__post_init__()
+    except ValueError as exc:
+        raise ValueError("principal is invalid") from exc
+
     settings = get_settings()
     workspace_root = Path(settings.council_workspace_root).resolve()
     session_project = _resolve_session_project(
@@ -190,6 +206,8 @@ def run_council(
             confirm_fn=confirm_fn,
         ),
         tracker=tracker,
+        principal=principal,
+        principal_resolver=principal_resolver,
         session=session,
         audit_logger=audit_logger,
     )
@@ -197,12 +215,15 @@ def run_council(
     session_status = "completed"
     try:
         with security_context(context):
-            planning_crew = build_planning_crew(preset, api_key)
+            planning_crew = build_planning_crew(preset, provider_credential)
             execution_crew = build_execution_crew(
                 preset,
-                api_key,
+                provider_credential,
             )
-            verification_crew = build_verification_crew(preset, api_key)
+            verification_crew = build_verification_crew(
+                preset,
+                provider_credential,
+            )
 
             if verbose:
                 planning_crew.verbose = True
@@ -224,7 +245,10 @@ def run_council(
             final_output = execution.raw
 
             if verdict.status == VerdictStatus.FAIL and preset.max_retries > 0:
-                escalation_crew = build_escalation_crew(preset, api_key)
+                escalation_crew = build_escalation_crew(
+                    preset,
+                    provider_credential,
+                )
                 if verbose:
                     escalation_crew.verbose = True
                 execution = run_escalation(

@@ -5,7 +5,7 @@ from __future__ import annotations
 from functools import lru_cache
 from pathlib import Path
 
-from pydantic import Field
+from pydantic import Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 PROJECT_ROOT = Path(__file__).resolve().parents[3]
@@ -19,13 +19,21 @@ class Settings(BaseSettings):
         extra="ignore",
     )
 
-    openrouter_api_key: str = Field(..., alias="OPENROUTER_API_KEY")
+    openrouter_api_key: SecretStr = Field(..., alias="OPENROUTER_API_KEY")
     council_default_preset: str = Field("glm-stack", alias="COUNCIL_DEFAULT_PRESET")
     council_workspace_root: Path = Field(
         default_factory=Path.cwd,
         alias="COUNCIL_WORKSPACE_ROOT",
     )
     max_tool_calls: int = Field(50, alias="COUNCIL_MAX_TOOL_CALLS", ge=1)
+    council_principal_id: str | None = Field(
+        None,
+        alias="COUNCIL_PRINCIPAL_ID",
+    )
+    council_principal_scopes: str = Field(
+        "read,filesystem:mutate,test,shell,high-risk:manage",
+        alias="COUNCIL_PRINCIPAL_SCOPES",
+    )
     presets_dir: Path = Field(default=PRESETS_DIR)
 
 

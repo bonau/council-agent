@@ -8,7 +8,7 @@ from crewai import Agent, Crew, Process, Task
 
 from council_agent.config.presets import Preset
 from council_agent.crews.base import crew_output_text, extract_json_block
-from council_agent.llm.openrouter import make_llm
+from council_agent.llm.openrouter import OpenRouterCredential, make_llm
 from council_agent.types import PlanArtifact
 
 PLANNING_BACKSTORY = (
@@ -31,13 +31,16 @@ Respond with a JSON object only (no extra text) using this schema:
 """
 
 
-def build_planning_crew(preset: Preset, api_key: str) -> Crew:
+def build_planning_crew(
+    preset: Preset,
+    provider_credential: OpenRouterCredential,
+) -> Crew:
     role = preset.planning
     agent = Agent(
         role="Planning Strategist",
         goal="Produce a clear, structured plan for the user's request",
         backstory=PLANNING_BACKSTORY,
-        llm=make_llm(role.model, role.temperature, api_key),
+        llm=make_llm(role.model, role.temperature, provider_credential),
         verbose=False,
     )
     task = Task(
