@@ -9,7 +9,7 @@ context: |
   Testing: uv run pytest
   Docs: README.md, ROADMAP.md, CONTRIBUTING.md, AGENTS.md
   Development policy: Spec-driven Development with OpenSpec (see AGENTS.md)
-  Current version: v0.7.0 — interactive confirmation for dangerous/write shell and filesystem mutate tools; command classification retained; structured audit logging in progress (v0.8 change)
+  Current version: v0.7.0 — interactive confirmation retained; structured audit logging implemented (pending 0.8.0 release bump)
   Capabilities: tools (filesystem, shell, run_tests, CrewAI wrappers), sandbox (WorkspaceGuard, session, CLI, audit dir), orchestration (tracker, max_tool_calls, auto summaries, confirmation policy, audit logger install), security (command classifier, interactive confirmation modes ask/auto/refuse/compat, structured audit JSONL + council audit show/export)
 
 rules:
