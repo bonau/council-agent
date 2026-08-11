@@ -3,13 +3,13 @@
 - [x] 1.1 Add closed schema-v1 policy, scope, authentication, grant, action-risk, interaction, outcome, and stable-reason models without CrewAI or runtime I/O.
 - [x] 1.2 Implement deterministic precedence evaluation and JSON-safe normalized evidence for `deny`, `require_confirmation`, and `allow`.
 - [x] 1.3 Add exhaustive table/property-style tests for every state, simultaneous-denial precedence, reason stability, serialization, and absence of raw authority data.
-- [ ] 1.4 Run the focused decision-matrix tests and full `uv run pytest` before dispatcher wiring.
+- [x] 1.4 Run the focused decision-matrix tests and full `uv run pytest` before dispatcher wiring.
 
 ## 2. Dispatcher and library integration
 
-- [ ] 2.1 Normalize existing policy, scope, authentication, action-risk, and confirmation results at the mandatory dispatcher; set v0.9.8 product grant state explicitly to not required.
-- [ ] 2.2 Attach one namespaced matrix version/vector/outcome/reason to result, tracker, session, and audit evidence without replacing detailed legacy evidence.
-- [ ] 2.3 Add library tests for policy/scope/authentication/grant-contract/risk/interaction precedence, `AUTO` bypass resistance, stable reasons, ordinary operation failures, audit consistency, and no side effects.
+- [x] 2.1 Normalize existing policy, scope, authentication, action-risk, and confirmation results at the mandatory dispatcher; set v0.9.8 product grant state explicitly to not required.
+- [x] 2.2 Attach one namespaced matrix version/vector/outcome/reason to result, tracker, session, and audit evidence without replacing detailed legacy evidence.
+- [x] 2.3 Add library tests for policy/scope/authentication/grant-contract/risk/interaction precedence, `AUTO` bypass resistance, stable reasons, ordinary operation failures, audit consistency, and no side effects.
 - [ ] 2.4 Run dispatcher-focused tests and full `uv run pytest` before framework/CLI integration.
 
 ## 3. Crew and CLI integration
