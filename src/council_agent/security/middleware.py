@@ -9,9 +9,8 @@ from contextvars import ContextVar, Token
 from dataclasses import dataclass, field, replace
 from enum import Enum
 from pathlib import Path
-from typing import Any, Iterator
+from typing import TYPE_CHECKING, Any, Iterator
 
-from council_agent.sandbox.session import SessionManager
 from council_agent.sandbox.workspace import DEFAULT_DENIED_PATTERNS, WorkspaceGuard
 from council_agent.security.audit import AuditLogger
 from council_agent.security.confirm import ConfirmationPolicy
@@ -21,6 +20,9 @@ from council_agent.security.policy import (
 )
 from council_agent.tools.base import ToolResult, _err
 from council_agent.tools.tracker import ToolCallTracker
+
+if TYPE_CHECKING:
+    from council_agent.sandbox.session import SessionManager
 
 POLICY_VERSION_UNVERSIONED = "v0.9-unversioned"
 POLICY_VERSION_BUILTIN = "builtin"
