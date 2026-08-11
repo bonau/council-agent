@@ -465,3 +465,44 @@ alpha 才開始實作 Trust Tier 0/1/2 runtime；本紀錄中的 v0.9.x 工作�
 - 基準：tag `v0.9.1`、PR #8、archive `2026-08-11-shell-containment`
 - 驗證：`./scripts/check.sh` 291 passed
 - 下一步：開 `policy-middleware` change（v0.9.2）
+
+### 2026-08-11 17:26 UTC — v0.9.2 Policy Middleware 實作與 regression
+
+- 狀態：runtime／integration regression 通過；OpenSpec sync／archive 與 post-archive gate 待完成
+- 基準：branch `cursor/v092-policy-middleware-d691`、pre-archive implementation revision `884e278`、package v0.9.1、change `policy-middleware`
+- 原始旁路：
+  - direct `tools.filesystem`／`tools.shell` 呼叫只執行 tool-local guard，沒有 wrapper-owned tracker、session、audit。
+  - Execution Crew `_invoke` 自行 pre-check limit、呼叫 `tracker.record()`、append session、`record_audit_event()`；direct library 與 Crew path 不同。
+  - orchestrator 分別安裝 project policy、confirmation、audit 三個 ContextVars，可能形成混用 snapshot／cleanup 漏洞。
+- 唯一產品入口：
+  - `tools` package 與 `tools.filesystem`／`tools.shell` 的六個 public functions 全部呼叫 `security.middleware.invoke()`。
+  - Execution Crew 六個 adapters 只轉接 typed input 與格式化 `ToolResult`；不接收 tracker/session，不做 policy／limit／session／audit decision。
+  - `run_council` 建立一份 `SecurityContext` 並跨 planning、execution、verification、escalation 安裝；目前 escalation 沒有 tools，但無第二個 product dispatcher。
+- `SecurityContext` 決策：
+  - frozen snapshot 包含 request ID、optional session ID、workspace guard、project policy、`v0.9-unversioned` label、confirmation、tracker、optional session/audit writer。
+  - label 不是 policy schema version；schema version 與 trust boundary 仍屬 v0.9.3。
+  - close-on-exit lease 讓 owner reset 後的 copied ContextVar 也以 `security_context_closed` 拒絕；未安裝是 `security_context_missing`。
+  - session workspace、session ID 與 audit logger session ID mismatch 在 operation 前拒絕。
+- Dispatcher 不變量：
+  - 一個 action ID 固定串起 context validation、limit、tool-specific policy／classification／confirmation、operation、tracker、optional session、optional audit。
+  - admitted action 只有一個 tracker summary／session result；`run_tests` 不遞迴 `run_command`。
+  - sandbox audit 每個 action 是同 request/action/session ID 的 `attempt` + `result`；policy／confirmation／limit deny、expected failure、exception、success 都經 middleware result。
+  - 無 sandbox 時仍有同一 middleware 與 in-memory tracker，但 `session=None`／`audit_logger=None`，不建立 `.council/` durable evidence。
+- 旁路／一致性證據：
+  - public filesystem mutation／shell 在缺 context 時不產生檔案或 process side effect。
+  - direct 與 Crew 對同一 unsupported action 都產生 `decision=deny`、`rejection_reason=unsupported`。
+  - 一個 Crew action 的 evidence 是一個 tracker、一個 session line、兩個 audit phases，wrapper 無重複。
+  - private underscore helpers 不從 `tools.__all__` export，且 security-sensitive helper 需要 active context；它們不是支援的 product authorization API。
+- 驗證：
+  - middleware core phase：303 passed。
+  - public boundary phase：311 passed。
+  - orchestrator／Crew integrated full regression：315 passed，exit code 0。
+  - change strict validation：1/1 passed，exit code 0。
+  - 詳細 evidence：[`v0.9.2-policy-middleware-evidence.md`](v0.9.2-policy-middleware-evidence.md)。
+- 剩餘風險／延期責任：
+  - Python 同 process 的 hostile caller 仍可 introspect private objects；本版關閉支援的產品入口旁路，不宣稱 language-runtime isolation。
+  - audit redaction、control-plane、sequence／gap、hash chain 屬 v0.9.4；目前 correlation 不是 integrity。
+  - project policy restrict-only boundary／versioned schema 屬 v0.9.3；principal、authentication、grant、decision matrix 仍依 v0.9.5–v0.9.8。
+  - Trust Tier 0/1/2 runtime 與 `council trust` 仍只屬 v1.0-alpha。
+- 文件影響：README、known issues、v0.9.x handoff 與本 learning log 更新；feature branch 不 bump version。
+- 下一步：完成 docs regression，sync security／tools／orchestration delta，strict validate，archive，再執行 post-archive `./scripts/check.sh`。

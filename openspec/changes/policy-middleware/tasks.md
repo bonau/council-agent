@@ -31,10 +31,10 @@
 
 ## 5. Documentation
 
-- [ ] 5.1 Update README with the dispatcher-backed library usage, missing-context fail-closed behavior, and explicit no-sandbox evidence behavior
-- [ ] 5.2 Close SEC-P0-002/V1-003 with evidence references in `docs/releases/v1.0-alpha-known-issues.md`
-- [ ] 5.3 Append v0.9.2 decisions, entry-point inventory, bypass closure, correlation evidence, and deferred risks to `docs/releases/learning-log-v1-prep.md`
-- [ ] 5.4 Mark v0.9.2 implementation/handoff state and next v0.9.3 boundary in `docs/releases/v0.9.x-handoff.md`
+- [x] 5.1 Update README with the dispatcher-backed library usage, missing-context fail-closed behavior, and explicit no-sandbox evidence behavior
+- [x] 5.2 Close SEC-P0-002/V1-003 with evidence references in `docs/releases/v1.0-alpha-known-issues.md`
+- [x] 5.3 Append v0.9.2 decisions, entry-point inventory, bypass closure, correlation evidence, and deferred risks to `docs/releases/learning-log-v1-prep.md`
+- [x] 5.4 Mark v0.9.2 implementation/handoff state and next v0.9.3 boundary in `docs/releases/v0.9.x-handoff.md`
 - [ ] 5.5 Commit and push documentation, then run `uv run pytest` with the full suite green
 
 ## 6. Verification and Spec Sync
