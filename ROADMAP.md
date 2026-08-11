@@ -4,7 +4,7 @@
 
 > **開發方式**：所有版本里程碑的實作，皆採 **Spec-driven Development** 並搭配 [OpenSpec](https://github.com/Fission-AI/OpenSpec)。每個 feature 分支應對應一個 OpenSpec change，詳見 [AGENTS.md](AGENTS.md)。
 
-## 現況（v0.9.9 implementation candidate；package metadata 仍為 v0.9.8）
+## 現況（v1.0.0-alpha.1）
 
 | 能力 | 狀態 |
 |------|------|
@@ -23,14 +23,14 @@
 | 互動確認（`--yes`／TTY ask／無 TTY refuse） | ✅ |
 | 審計日誌（`.council/audit/` + `council audit show`／`export`） | ✅ |
 | 政策設定檔（`council.policy.yaml`） | ✅ |
-| Verification／escalation attempt evidence closure | ✅（v0.9.9 implementation） |
-| Trust Tier decision matrix | ✅（matrix-v1；未啟用 tier runtime） |
-| Trust Tier | ❌（v1.0） |
+| Verification／escalation attempt evidence closure | ✅ |
+| Trust Tier decision matrix | ✅（matrix-v2） |
+| Trust Tier 0/1/2 runtime + `--trust-tier` | ✅ |
+| Audit predecessor hash chain | ❌（GA） |
 
-已發佈基線 v0.9.8 具 mandatory dispatcher、restrict-only project policy、scoped principal、high-risk authentication、user-owned grant store foundation、matrix-v1 decision 與 redacted／sequenced per-event audit integrity。v0.9.9 implementation 另關閉 escalation 後未重新 Verification 與跨 attempt evidence 對不齊；package version bump／tag 仍只可在 `release/0.9.9` 進行。
+已發佈基線 `v1.0.0-alpha.1`：Trust Tier 0/1/2 runtime、exact grant 消費、matrix-v2。下一階段為 v1.0-beta（凍結 schema、公開測試）。
 
-> **v1.0 準備（2026-08-11）**：**v0.9.1–v0.9.9 implementation 清債序列已完成並停止**。下一動作只能另開 v1.0-alpha Trust Tier change；是否進入 alpha 仍須依 release/tag、獨立真人／Agent 手冊與 admission gate 決定。詳見 [docs/releases/major-release-prep-playbook.md](docs/releases/major-release-prep-playbook.md)、[docs/releases/v1.0-alpha-known-issues.md](docs/releases/v1.0-alpha-known-issues.md)。
-> 已知限制：shell／WorkspaceGuard 非 OS sandbox；`run_tests` 會執行 project code；ConfirmMode／`--yes` ≠ Trust Tier；grant store 尚未接產品 tool；audit 有 redaction、sequence 與 canonical per-event ID，但無 predecessor-linked／external anchor；Verification evidence requirement 使用保守 lexical rule。
+> 已知限制：shell／WorkspaceGuard 非 OS sandbox；`run_tests` 會執行 project code；ConfirmMode／`--yes` ≠ Trust Tier；project policy 不能設定 tier；audit 無 predecessor-linked／external anchor。
 
 ## 目標里程碑
 

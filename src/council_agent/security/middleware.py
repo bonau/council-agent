@@ -59,11 +59,23 @@ from council_agent.security.principal import (
     evaluate_principal_scopes,
     required_scopes_for_action,
 )
+from council_agent.security.trust import (
+    TierTranslation,
+    TrustTier,
+    get_active_tier_translation,
+    parse_trust_tier,
+    reset_active_tier_translation,
+    resource_for_tool,
+    set_active_tier_translation,
+    should_lookup_grant,
+    translate_tier,
+)
 from council_agent.tools.base import ToolResult, _err
 from council_agent.tools.tracker import ToolCallTracker
 
 if TYPE_CHECKING:
     from council_agent.sandbox.session import SessionManager
+    from council_agent.security.trust_grants import TrustGrantStore
 
 POLICY_VERSION_UNVERSIONED = "v0.9-unversioned"
 POLICY_VERSION_BUILTIN = "builtin"
@@ -162,6 +174,14 @@ class SecurityContext:
         compare=False,
     )
     require_high_risk_step_up: bool = False
+    # Library default is Tier 1 (ConfirmMode.COMPAT-friendly). Product CLI
+    # still defaults to Tier 0 via `council run --trust-tier`.
+    trust_tier: TrustTier = TrustTier.TIER_1
+    trust_grant_store: TrustGrantStore | None = field(
+        default=None,
+        repr=False,
+        compare=False,
+    )
     session_id: str | None = None
     session: SessionManager | None = None
     audit_logger: AuditLogger | None = None
@@ -187,6 +207,8 @@ class SecurityContext:
         authentication_manager: AuthenticationManager | None = None,
         step_up_provider: StepUpProvider | None = None,
         require_high_risk_step_up: bool = False,
+        trust_tier: TrustTier | int | str = TrustTier.TIER_1,
+        trust_grant_store: TrustGrantStore | None = None,
         session: SessionManager | None = None,
         audit_logger: AuditLogger | None = None,
     ) -> SecurityContext:
@@ -211,6 +233,8 @@ class SecurityContext:
             authentication_manager=authentication_manager,
             step_up_provider=step_up_provider,
             require_high_risk_step_up=require_high_risk_step_up,
+            trust_tier=parse_trust_tier(trust_tier),
+            trust_grant_store=trust_grant_store,
             session_id=resolved_session_id,
             session=session,
             audit_logger=audit_logger,
@@ -580,8 +604,14 @@ def _interaction_state(
     policy: ConfirmationPolicy,
     risk: ActionRisk,
     result: ToolResult,
+    translation: TierTranslation | None = None,
 ) -> InteractionState:
-    if risk is ActionRisk.READ:
+    if translation is not None and translation.auto_approve_interaction:
+        return InteractionState.AUTO_APPROVED
+    if (
+        risk is ActionRisk.READ
+        and (translation is None or not translation.require_confirmation)
+    ):
         return InteractionState.NOT_REQUIRED
 
     outcome = result.metadata.get("confirmation")
@@ -606,6 +636,76 @@ def _interaction_state(
     return InteractionState.COMPAT_ALLOW
 
 
+def _predict_action_risk(
+    tool_name: str,
+    tool_args: dict[str, Any],
+) -> ActionRisk:
+    """Estimate risk before the handler runs (no rejection metadata yet)."""
+
+    return _action_risk(
+        tool_name,
+        tool_args,
+        ToolResult(success=True, output="", error=None, metadata={}),
+    )
+
+
+def _lookup_grant_for_action(
+    context: SecurityContext,
+    tool_name: str,
+    tool_args: dict[str, Any],
+    authorization: ScopeDecision,
+) -> Any:
+    """Perform exact grant lookup when the active tier may consume grants."""
+
+    from council_agent.security.trust_grants import GrantLookupDecision, GrantLookupReason
+
+    store = context.trust_grant_store
+    principal = context.principal
+    if store is None or principal is None:
+        return GrantLookupDecision(
+            allowed=False,
+            reason=GrantLookupReason.NOT_FOUND,
+            principal_ref=principal.audit_ref if principal is not None else "none",
+            required_scopes=authorization.required_scopes,
+            granted_scopes=frozenset(),
+        )
+    try:
+        return store.lookup(
+            principal,
+            tool_name,
+            resource_for_tool(tool_name, tool_args),
+            authorization.required_scopes,
+            session_id=context.session_id or context.request_id,
+            request_id=context.request_id,
+        )
+    except Exception:
+        return GrantLookupDecision(
+            allowed=False,
+            reason=GrantLookupReason.NOT_FOUND,
+            principal_ref=principal.audit_ref,
+            required_scopes=authorization.required_scopes,
+            granted_scopes=frozenset(),
+        )
+
+
+def _prepare_tier_translation(
+    context: SecurityContext,
+    tool_name: str,
+    tool_args: dict[str, Any],
+    authorization: ScopeDecision,
+) -> TierTranslation:
+    risk = _predict_action_risk(tool_name, tool_args)
+    lookup = None
+    if should_lookup_grant(context.trust_tier, risk):
+        lookup = _lookup_grant_for_action(
+            context,
+            tool_name,
+            tool_args,
+            authorization,
+        )
+    return translate_tier(context.trust_tier, risk, lookup)
+
+
 def _runtime_trust_decision(
     context: SecurityContext,
     tool_name: str,
@@ -613,10 +713,15 @@ def _runtime_trust_decision(
     result: ToolResult,
     authorization: ScopeDecision,
     authentication: AuthenticationDecision,
+    translation: TierTranslation | None = None,
 ) -> TrustDecision:
-    """Translate current product gates into the v0.9.8 matrix contract."""
+    """Translate current product gates into the matrix-v1 contract."""
 
     risk = _action_risk(tool_name, tool_args, result)
+    active = translation or get_active_tier_translation()
+    grant_state = (
+        GrantState.NOT_REQUIRED if active is None else active.grant_state
+    )
     return evaluate_decision(
         DecisionVector(
             policy=_policy_state_for_action(
@@ -627,10 +732,14 @@ def _runtime_trust_decision(
             ),
             scope=_scope_state(authorization),
             authentication=_authentication_state(authentication),
-            # Persisted grants remain deliberately disconnected until v1.0-alpha.
-            grant=GrantState.NOT_REQUIRED,
+            grant=grant_state,
             risk=risk,
-            interaction=_interaction_state(context.confirmation, risk, result),
+            interaction=_interaction_state(
+                context.confirmation,
+                risk,
+                result,
+                active,
+            ),
         )
     )
 
@@ -642,12 +751,14 @@ def _correlation_metadata(
     authorization: ScopeDecision | None = None,
     authentication: AuthenticationDecision | None = None,
     trust_decision: TrustDecision | None = None,
+    translation: TierTranslation | None = None,
 ) -> dict[str, Any]:
     metadata: dict[str, Any] = {
         "request_id": context.request_id,
         "action_id": action_id,
         "decision": decision,
         "policy_version": context.policy_version,
+        "trust_tier": int(context.trust_tier),
     }
     pipeline_attempt_id = get_pipeline_attempt_id()
     if pipeline_attempt_id is not None:
@@ -658,6 +769,9 @@ def _correlation_metadata(
         metadata["session_authentication"] = authentication.to_metadata()
     if trust_decision is not None:
         metadata["trust_decision"] = trust_decision.to_metadata()
+    active = translation or get_active_tier_translation()
+    if active is not None and active.lookup_metadata is not None:
+        metadata["trust_grant_lookup"] = active.lookup_metadata
     if context.session_id is not None:
         metadata["session_id"] = context.session_id
     return metadata
@@ -673,10 +787,13 @@ def _with_correlation(
     *,
     tool_name: str | None = None,
     tool_args: dict[str, Any] | None = None,
+    translation: TierTranslation | None = None,
 ) -> ToolResult:
     trust_decision = None
     normalized_metadata = dict(result.metadata)
     effective_decision = decision
+    success = result.success
+    error = result.error
     if (
         tool_name is not None
         and tool_args is not None
@@ -690,15 +807,21 @@ def _with_correlation(
             result,
             authorization,
             authentication,
+            translation=translation,
         )
         if trust_decision.outcome is TrustDecisionOutcome.DENY:
             effective_decision = TrustDecisionOutcome.DENY.value
+            success = False
             if (
                 trust_decision.reason.value
                 != "action_risk_unrecognized"
             ):
                 normalized_metadata["rejection_reason"] = (
                     trust_decision.reason.value
+                )
+            if error is None:
+                error = (
+                    f"Trust decision denied ({trust_decision.reason.value})"
                 )
         elif (
             trust_decision.outcome is TrustDecisionOutcome.REQUIRE_CONFIRMATION
@@ -709,9 +832,9 @@ def _with_correlation(
             effective_decision = TrustDecisionOutcome.ALLOW.value
 
     return ToolResult(
-        success=result.success,
+        success=success,
         output=result.output,
-        error=result.error,
+        error=error,
         metadata={
             **normalized_metadata,
             **_correlation_metadata(
@@ -721,6 +844,7 @@ def _with_correlation(
                 authorization,
                 authentication,
                 trust_decision,
+                translation=translation,
             ),
         },
     )
@@ -1126,33 +1250,20 @@ def invoke(tool_name: str, **tool_args: Any) -> ToolResult:
             authentication=authentication,
         )
 
-    try:
-        raw_result = handler(context, **tool_args)
-        if not isinstance(raw_result, ToolResult):
-            raise TypeError("tool handler must return ToolResult")
-    except Exception as exc:
-        raw_result = _err(
-            f"Tool handler failed: {exc}",
-            rejection_reason="tool_exception",
-        )
-
-    decision = _decision_for_result(raw_result)
-    result = _with_correlation(
-        raw_result,
+    translation = _prepare_tier_translation(
         context,
-        action_id,
-        decision,
+        tool_name,
+        tool_args,
         authorization,
-        authentication,
-        tool_name=tool_name,
-        tool_args=tool_args,
     )
-    summary = context.tracker.record_result(tool_name, tool_args, result)
-    if summary is None:
+    if translation.grant_state not in {
+        GrantState.NOT_REQUIRED,
+        GrantState.VALID,
+    }:
         result = _with_correlation(
             _err(
-                "Tool result could not be tracked",
-                rejection_reason="tracker_failure",
+                f"Trust grant denied ({translation.grant_state.value})",
+                rejection_reason=translation.grant_state.value,
             ),
             context,
             action_id,
@@ -1161,7 +1272,61 @@ def invoke(tool_name: str, **tool_args: Any) -> ToolResult:
             authentication,
             tool_name=tool_name,
             tool_args=tool_args,
+            translation=translation,
         )
+        return _finalize_evidence(
+            context,
+            tool=tool_name,
+            args=tool_args,
+            action_id=action_id,
+            result=result,
+            attempt=attempt,
+            authorization=authorization,
+            authentication=authentication,
+        )
+
+    tier_token = set_active_tier_translation(translation)
+    try:
+        try:
+            raw_result = handler(context, **tool_args)
+            if not isinstance(raw_result, ToolResult):
+                raise TypeError("tool handler must return ToolResult")
+        except Exception as exc:
+            raw_result = _err(
+                f"Tool handler failed: {exc}",
+                rejection_reason="tool_exception",
+            )
+
+        decision = _decision_for_result(raw_result)
+        result = _with_correlation(
+            raw_result,
+            context,
+            action_id,
+            decision,
+            authorization,
+            authentication,
+            tool_name=tool_name,
+            tool_args=tool_args,
+            translation=translation,
+        )
+        summary = context.tracker.record_result(tool_name, tool_args, result)
+        if summary is None:
+            result = _with_correlation(
+                _err(
+                    "Tool result could not be tracked",
+                    rejection_reason="tracker_failure",
+                ),
+                context,
+                action_id,
+                "deny",
+                authorization,
+                authentication,
+                tool_name=tool_name,
+                tool_args=tool_args,
+                translation=translation,
+            )
+    finally:
+        reset_active_tier_translation(tier_token)
 
     return _finalize_evidence(
         context,

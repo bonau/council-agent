@@ -819,3 +819,28 @@ alpha 才開始實作 Trust Tier 0/1/2 runtime；本紀錄中的 v0.9.x 工作�
 - 驗證：568 passed；`./scripts/check.sh` 全綠
 - 決策：不開 Trust Tier runtime；留給後續 Agent 依 playbook alpha 准入條件啟動
 - 下一步（其他 Agent）：確認 known-issues P0／P1 全關 → 開 `trust-framework` change（v1.0-alpha）
+
+### 2026-08-11 23:01 UTC — v1.0-alpha admission（Cloud Agent 代跑）
+
+- 狀態：通過（alpha admitted；真人手冊 ACCEPTED GATE）
+- 基準：branch `cursor/v1-admission-fce3`、commit `4f41a8753897b295142e62ddfd6d4a6e1017493e`、package `0.9.9`、無 active OpenSpec change
+- 觀察：
+  - `./scripts/check.sh`：568 passed；specs 5/5 strict；changes 無項目可驗證；exit 0。
+  - 乾淨暫存 workspace 跑 SMK-00～SMK-09 全部 PASS；outside sentinel SHA-256 不變。
+  - Agent checklist 對應 smoke + 聚焦 pytest 84 passed。
+  - LIVE-01：BLOCKED（無核准 provider／外連）。
+- 矛盾或風險：playbook 要求獨立真人走手冊；本 Cloud 環境無獨立真人。使用者明確核准選項 1（Agent＋smoke 代為 admission）。
+- 決策：標記真人手冊為 ACCEPTED GATE（見 `docs/releases/evidence/v1.0.0-alpha.1/human-manual-status.md`），不偽稱真人已執行；允許開 `trust-framework`。
+- 驗證：
+  - evidence：`docs/releases/evidence/v1.0.0-alpha.1/`（`check.sh.log`、`smoke-test.md`、`smoke-results.json`、`agent-manual-run.md`、`human-manual-status.md`）
+- 剩餘風險：TTY ASK 真人 UX 未覆核；公開 beta／GA 前有真人資源應補 MAN-01～14。Trust Tier runtime 尚未實作。
+- 文件影響：handoff、known-issues、本 learning log。
+- 下一步：開 `cursor/trust-framework-fce3` + OpenSpec change `trust-framework`。
+
+### 2026-08-11 23:09 UTC — trust-framework implementation
+
+- 狀態：實作與 full regression 通過；待 sync/archive 與 release/1.0.0a1
+- 基準：branch `cursor/trust-framework-fce3`、package metadata 0.9.9、change `trust-framework`
+- 決策：matrix v2 允許 read+interaction；CLI 預設 Tier 0；library/run_council 預設 Tier 1；exact grant lookup 僅 dispatcher；Tier 2 選用需 step-up
+- 驗證：`uv run pytest` 577 passed
+- 下一步：sync specs → archive → release 1.0.0a1 / tag v1.0.0-alpha.1

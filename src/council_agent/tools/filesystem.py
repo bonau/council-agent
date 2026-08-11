@@ -9,7 +9,10 @@ from council_agent.sandbox.workspace import (
     WorkspaceBoundaryError,
     WorkspaceGuardError,
 )
-from council_agent.security.confirm import ActionKind, evaluate_confirmation
+from council_agent.security.confirm import (
+    ActionKind,
+    evaluate_tier_aware_confirmation,
+)
 from council_agent.security.middleware import (
     SecurityContext,
     _register_tool,
@@ -30,24 +33,43 @@ def _guard_error(error: WorkspaceGuardError) -> ToolResult:
     return _err(str(error), rejection_reason=reason)
 
 
+def _confirm_meta(decision_outcome: str) -> dict[str, str]:
+    if decision_outcome == "compat_allow":
+        return {}
+    return {"confirmation": decision_outcome}
+
+
 def _read_file(context: SecurityContext, *, path: str) -> ToolResult:
     context.validate(require_active=True)
     try:
         target = context.workspace.resolve(path)
     except WorkspaceGuardError as exc:
         return _guard_error(exc)
+
+    decision = evaluate_tier_aware_confirmation(
+        context.confirmation,
+        ActionKind.READ_FILE,
+        path,
+    )
+    confirm_meta = _confirm_meta(decision.outcome.value)
+    if not decision.allowed:
+        return _err(
+            f"read_file confirmation {decision.outcome.value}: {path}",
+            **confirm_meta,
+        )
+
     try:
         if not target.exists():
-            return _err(f"File not found: {path}")
+            return _err(f"File not found: {path}", **confirm_meta)
         if target.is_dir():
-            return _err(f"Path is a directory, not a file: {path}")
+            return _err(f"Path is a directory, not a file: {path}", **confirm_meta)
         content = target.read_text(encoding=_ENCODING)
         data = content.encode(_ENCODING)
-        return _ok(content, size=len(data), encoding=_ENCODING)
+        return _ok(content, size=len(data), encoding=_ENCODING, **confirm_meta)
     except PermissionError:
-        return _err(f"Permission denied: {path}")
+        return _err(f"Permission denied: {path}", **confirm_meta)
     except OSError as exc:
-        return _err(str(exc))
+        return _err(str(exc), **confirm_meta)
 
 
 def _write_file(
@@ -62,14 +84,12 @@ def _write_file(
     except WorkspaceGuardError as exc:
         return _guard_error(exc)
 
-    decision = evaluate_confirmation(
+    decision = evaluate_tier_aware_confirmation(
         context.confirmation,
         ActionKind.WRITE_FILE,
         path,
     )
-    confirm_meta: dict[str, str] = {}
-    if decision.outcome.value != "compat_allow":
-        confirm_meta["confirmation"] = decision.outcome.value
+    confirm_meta = _confirm_meta(decision.outcome.value)
     if not decision.allowed:
         return _err(
             f"write_file confirmation {decision.outcome.value}: {path}",
@@ -94,18 +114,31 @@ def _list_dir(context: SecurityContext, *, path: str) -> ToolResult:
         target = context.workspace.resolve(path)
     except WorkspaceGuardError as exc:
         return _guard_error(exc)
+
+    decision = evaluate_tier_aware_confirmation(
+        context.confirmation,
+        ActionKind.READ_FILE,
+        path,
+    )
+    confirm_meta = _confirm_meta(decision.outcome.value)
+    if not decision.allowed:
+        return _err(
+            f"list_dir confirmation {decision.outcome.value}: {path}",
+            **confirm_meta,
+        )
+
     try:
         if not target.exists():
-            return _err(f"Directory not found: {path}")
+            return _err(f"Directory not found: {path}", **confirm_meta)
         if not target.is_dir():
-            return _err(f"Path is not a directory: {path}")
+            return _err(f"Path is not a directory: {path}", **confirm_meta)
         entries = sorted(entry.name for entry in target.iterdir())
         names = "\n".join(entries)
-        return _ok(names, entries=entries)
+        return _ok(names, entries=entries, **confirm_meta)
     except PermissionError:
-        return _err(f"Permission denied: {path}")
+        return _err(f"Permission denied: {path}", **confirm_meta)
     except OSError as exc:
-        return _err(str(exc))
+        return _err(str(exc), **confirm_meta)
 
 
 def _delete_file(context: SecurityContext, *, path: str) -> ToolResult:
@@ -115,14 +148,12 @@ def _delete_file(context: SecurityContext, *, path: str) -> ToolResult:
     except WorkspaceGuardError as exc:
         return _guard_error(exc)
 
-    decision = evaluate_confirmation(
+    decision = evaluate_tier_aware_confirmation(
         context.confirmation,
         ActionKind.DELETE_FILE,
         path,
     )
-    confirm_meta: dict[str, str] = {}
-    if decision.outcome.value != "compat_allow":
-        confirm_meta["confirmation"] = decision.outcome.value
+    confirm_meta = _confirm_meta(decision.outcome.value)
     if not decision.allowed:
         return _err(
             f"delete_file confirmation {decision.outcome.value}: {path}",

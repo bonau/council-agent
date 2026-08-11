@@ -22,7 +22,10 @@ from council_agent.security.classifier import (
     RejectedCommandAnalysis,
     classify_command,
 )
-from council_agent.security.confirm import ActionKind, evaluate_confirmation
+from council_agent.security.confirm import (
+    ActionKind,
+    evaluate_tier_aware_confirmation,
+)
 from council_agent.security.middleware import (
     SecurityContext,
     _register_tool,
@@ -151,16 +154,14 @@ def _authorize_action(
             detail = "not in allowed_commands"
         return _err(f"Command denied by policy ({reason}; {detail})", **meta)
 
-    gate_kind: ActionKind | None = None
     if action.category is CommandCategory.DANGEROUS:
         gate_kind = ActionKind.DANGEROUS_SHELL
     elif action.category is CommandCategory.WRITE:
         gate_kind = ActionKind.WRITE_SHELL
+    else:
+        gate_kind = ActionKind.READ_SHELL
 
-    if gate_kind is None:
-        return class_meta
-
-    decision = evaluate_confirmation(
+    decision = evaluate_tier_aware_confirmation(
         context.confirmation,
         gate_kind,
         action.canonical_command,

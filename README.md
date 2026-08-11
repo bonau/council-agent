@@ -20,7 +20,7 @@ OpenRouter + CrewAI 三階段 CLI 框架：每次推論依序經過 **計劃 →
 - Verification 只使用同一 pipeline attempt 的結構化 tool evidence；成功條件要求 tool／pytest 時，缺少 correlation、exit code 或成功計數不得 PASS
 - 可選 `.council/` sandbox：session 紀錄（`meta.json` + `tools.jsonl`）與跨 session 審計（`audit/events.jsonl`）
 
-> **安全提示**：`run_command` 只接受下述受限 simple grammar，並使用 argv + `shell=False`；這是 command boundary 強化，**不是** OS／容器級 sandbox。現有 mandatory dispatcher 已分離 project policy、principal scopes、high-risk step-up authentication、user-owned trust grant store foundation、matrix-v1 decision 與互動確認；但 persisted grant 尚未接到產品 tool，且沒有 Trust Tier 0/1/2 runtime／`--trust-tier`。`council.policy.yaml` 只能加限制；受控 filesystem tools 與已建模 shell path action 預設禁止直接存取控制面。這仍無法阻止 `run_tests` 執行的惡意專案程式碼、host user 或外部程序改檔，audit 也不是 externally anchored hash chain。請僅在信任的專案目錄與可丟棄環境使用。v1.0 前清債與測試文件見 [docs/index.md](docs/index.md)、[ROADMAP.md](ROADMAP.md)。
+> **安全提示**：`run_command` 只接受下述受限 simple grammar，並使用 argv + `shell=False`；這是 command boundary 強化，**不是** OS／容器級 sandbox。Mandatory dispatcher 已串起 project policy、principal scopes、high-risk step-up、user-owned grant store、Trust Tier 0/1/2（CLI `--trust-tier`，預設 0）與 matrix-v2 decision。`--yes` 只跳過互動，不是 Tier 2。`council.policy.yaml` 只能加限制，不能設定 tier。這仍無法阻止 `run_tests` 執行的惡意專案程式碼、host user 或外部程序改檔，audit 也不是 externally anchored hash chain。請僅在信任的專案目錄與可丟棄環境使用。見 [docs/index.md](docs/index.md)、[ROADMAP.md](ROADMAP.md)。
 
 ## Presets
 
@@ -192,7 +192,7 @@ Authentication state只存在process memory，restart會使outstanding challenge
 
 `council trust grant/revoke/list` 管理 workspace 外的 user-owned schema-v1 store。Store 會驗證 owner-only 權限、non-symlink／workspace non-overlap、strict records、atomic replace 與 persistent revoke；管理操作需要獨立 fresh authentication。這是 grant 管理基礎，不代表產品 tool 已消費 grant。
 
-每個產品 tool action 由 dispatcher 產生 matrix-v1 `trust_decision`，固定依 policy → scope → authentication → grant → risk → interaction 判定，並在 result、tracker、session 與 audit 保留相同 normalized evidence。v0.9.x runtime 固定 grant 為 `trust_grant_not_required`；Tier 0/1/2 source、grant lookup、tier translator 與 `--trust-tier` 只屬後續獨立 v1.0-alpha change。
+每個產品 tool action 由 dispatcher 產生 matrix-v2 `trust_decision`，固定依 policy → scope → authentication → grant → risk → interaction 判定，並在 result、tracker、session 與 audit 保留相同 normalized evidence。Trust Tier 透過 translator 寫入 grant／interaction；exact grant lookup 只在 dispatcher 進行。CLI：`council run --trust-tier {0,1,2}`（預設 0）；Tier 2 需 `high-risk:manage` 與 fresh step-up。
 
 ### Verification／Escalation evidence
 

@@ -144,9 +144,12 @@ def test_refused_interaction_is_final_gate_for_authorized_mutation(
 def test_ordinary_operation_failure_remains_security_allowed(
     tmp_path: Path,
 ) -> None:
+    from council_agent.security.trust import TrustTier
+
     context = SecurityContext.create(
         tmp_path,
         principal=_principal(PrincipalScope.READ),
+        trust_tier=TrustTier.TIER_1,
         confirmation=ConfirmationPolicy(mode=ConfirmMode.REFUSE),
     )
 
@@ -162,20 +165,21 @@ def test_ordinary_operation_failure_remains_security_allowed(
     assert decision["vector"]["interaction"] == "not_required"
 
 
-def test_runtime_grant_state_is_explicitly_disconnected(
-    tmp_path: Path,
-) -> None:
+def test_tier1_read_does_not_open_grant_store(tmp_path: Path) -> None:
+    from council_agent.security.trust import TrustTier
+
     (tmp_path / "item.txt").write_text("content", encoding="utf-8")
     context = SecurityContext.create(
         tmp_path,
         principal=_principal(PrincipalScope.READ),
+        trust_tier=TrustTier.TIER_1,
     )
 
     with (
         without_security_context(),
         security_context(context),
         mock.patch(
-            "council_agent.security.trust_grants.TrustGrantStore.lookup"
+            "council_agent.security.middleware._lookup_grant_for_action"
         ) as lookup,
     ):
         result = read_file("item.txt")
@@ -185,6 +189,7 @@ def test_runtime_grant_state_is_explicitly_disconnected(
         result.metadata["trust_decision"]["vector"]["grant"]
         == "trust_grant_not_required"
     )
+    assert result.metadata["trust_tier"] == 1
     assert lookup.call_count == 0
 
 

@@ -220,9 +220,9 @@ def test_complete_vector_and_result_are_stable_json_evidence() -> None:
     encoded = json.dumps(first.to_metadata(), sort_keys=True)
 
     assert first == second
-    assert first.matrix_version == TRUST_DECISION_MATRIX_VERSION == 1
+    assert first.matrix_version == TRUST_DECISION_MATRIX_VERSION == 2
     assert first.to_metadata() == {
-        "matrix_version": 1,
+        "matrix_version": 2,
         "outcome": "allow",
         "reason": "decision_allowed",
         "vector": {
@@ -266,13 +266,15 @@ def test_vector_rejects_untyped_states(
 
 
 def test_incoherent_interaction_combinations_are_rejected() -> None:
-    with pytest.raises(ValueError, match="Read-risk"):
-        evaluate_decision(
-            _vector(
-                risk=ActionRisk.READ,
-                interaction=InteractionState.AUTO_APPROVED,
-            )
+    # Matrix v2 allows read + interaction (Trust Tier 0). Mutate still needs
+    # an interaction disposition.
+    allowed = evaluate_decision(
+        _vector(
+            risk=ActionRisk.READ,
+            interaction=InteractionState.AUTO_APPROVED,
         )
+    )
+    assert allowed.outcome.value == "allow"
 
     with pytest.raises(ValueError, match="require interaction"):
         evaluate_decision(
