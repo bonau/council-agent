@@ -16,10 +16,10 @@
 
 ## 3. Orchestrator Wiring
 
-- [ ] 3.1 Construct the tracker, optional session/audit objects, loaded policy, confirmation policy, workspace guard, and request identity as one `SecurityContext`
-- [ ] 3.2 Install one context across planning, execution, verification, and escalation and guarantee cleanup/fail-closed behavior on success and exceptions
-- [ ] 3.3 Preserve read-only compatibility getters while removing independent policy/confirmation/audit ContextVar installation from the product orchestrator
-- [ ] 3.4 Add orchestrator tests for one snapshot, sandbox/no-sandbox behavior, cleanup, invalid policy before context, and exception paths
+- [x] 3.1 Construct the tracker, optional session/audit objects, loaded policy, confirmation policy, workspace guard, and request identity as one `SecurityContext`
+- [x] 3.2 Install one context across planning, execution, verification, and escalation and guarantee cleanup/fail-closed behavior on success and exceptions
+- [x] 3.3 Preserve read-only compatibility getters while removing independent policy/confirmation/audit ContextVar installation from the product orchestrator
+- [x] 3.4 Add orchestrator tests for one snapshot, sandbox/no-sandbox behavior, cleanup, invalid policy before context, and exception paths
 - [ ] 3.5 Commit and push the orchestration phase, then run `uv run pytest` with the full existing suite green
 
 ## 4. CrewAI Adapter and End-to-End Integration

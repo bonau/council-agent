@@ -20,14 +20,10 @@ from council_agent.security import (
     ConfirmFn,
     ConfirmMode,
     ConfirmationPolicy,
+    SecurityContext,
     default_audit_events_path,
     load_policy_file,
-    reset_active_policy,
-    reset_audit_logger,
-    reset_confirmation_policy,
-    set_active_policy,
-    set_audit_logger,
-    set_confirmation_policy,
+    security_context,
 )
 from council_agent.tools import ToolCallTracker
 from council_agent.types import (
@@ -179,72 +175,78 @@ def run_council(
 
     tracker = ToolCallTracker(max_tool_calls=get_effective_max_tool_calls(preset))
 
-    planning_crew = build_planning_crew(preset, api_key)
-    execution_crew = build_execution_crew(
-        preset,
-        api_key,
-        tracker=tracker,
-        session=session,
-    )
-    verification_crew = build_verification_crew(preset, api_key)
-
-    if verbose:
-        planning_crew.verbose = True
-        execution_crew.verbose = True
-        verification_crew.verbose = True
-
-    project_policy_token = (
-        set_active_policy(loaded_policy) if loaded_policy is not None else None
-    )
-    confirm_policy_token = set_confirmation_policy(
-        ConfirmationPolicy(mode=confirm_mode, confirm_fn=confirm_fn)
-    )
-    audit_token = None
+    audit_logger = None
     if session is not None and session_project is not None:
         audit_logger = AuditLogger(
             default_audit_events_path(session_project),
             session_id=session.meta.session_id,
         )
-        audit_token = set_audit_logger(audit_logger)
+
+    context = SecurityContext.create(
+        workspace_root,
+        policy=loaded_policy,
+        confirmation=ConfirmationPolicy(
+            mode=confirm_mode,
+            confirm_fn=confirm_fn,
+        ),
+        tracker=tracker,
+        session=session,
+        audit_logger=audit_logger,
+    )
 
     session_status = "completed"
     try:
-        plan = run_planning(planning_crew, prompt)
-        execution = run_execution(
-            execution_crew, prompt, plan, tracker=tracker
-        )
-        verdict = run_verification(verification_crew, prompt, plan, execution)
-
-        escalated = False
-        final_output = execution.raw
-
-        if verdict.status == VerdictStatus.FAIL and preset.max_retries > 0:
-            escalation_crew = build_escalation_crew(preset, api_key)
-            if verbose:
-                escalation_crew.verbose = True
-            execution = run_escalation(
-                escalation_crew, prompt, plan, execution, verdict
+        with security_context(context):
+            planning_crew = build_planning_crew(preset, api_key)
+            execution_crew = build_execution_crew(
+                preset,
+                api_key,
+                tracker=tracker,
+                session=session,
             )
-            escalated = True
+            verification_crew = build_verification_crew(preset, api_key)
+
+            if verbose:
+                planning_crew.verbose = True
+                execution_crew.verbose = True
+                verification_crew.verbose = True
+
+            plan = run_planning(planning_crew, prompt)
+            execution = run_execution(
+                execution_crew, prompt, plan, tracker=tracker
+            )
+            verdict = run_verification(
+                verification_crew,
+                prompt,
+                plan,
+                execution,
+            )
+
+            escalated = False
             final_output = execution.raw
 
-        return CouncilResult(
-            prompt=prompt,
-            plan=plan,
-            execution=execution,
-            verdict=verdict,
-            escalated=escalated,
-            final_output=final_output,
-        )
+            if verdict.status == VerdictStatus.FAIL and preset.max_retries > 0:
+                escalation_crew = build_escalation_crew(preset, api_key)
+                if verbose:
+                    escalation_crew.verbose = True
+                execution = run_escalation(
+                    escalation_crew, prompt, plan, execution, verdict
+                )
+                escalated = True
+                final_output = execution.raw
+
+            return CouncilResult(
+                prompt=prompt,
+                plan=plan,
+                execution=execution,
+                verdict=verdict,
+                escalated=escalated,
+                final_output=final_output,
+            )
     except Exception:
         session_status = "failed"
         raise
     finally:
-        reset_confirmation_policy(confirm_policy_token)
-        if project_policy_token is not None:
-            reset_active_policy(project_policy_token)
-        if audit_token is not None:
-            reset_audit_logger(audit_token)
         if session is not None:
             # Keep count in sync if tools logged via tracker but finalize late.
             session.meta.tool_call_count = max(
