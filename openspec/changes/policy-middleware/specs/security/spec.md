@@ -69,7 +69,7 @@ When durable audit storage is present in the security context, the dispatcher SH
 ### Requirement: Structured audit log records
 The system SHALL support appending structured audit records for dispatched tool invocations. Each middleware-owned record SHALL include: a UTC timestamp, phase (`attempt` or `result`), tool name, arguments, optional success boolean, optional error message, metadata (JSON-serializable), request id, action id, decision when known, and optional session id identifying the caller run. Existing non-tool administrative audit callers MAY emit a single `result` record. When no audit logger is installed for the current security context, durable recording SHALL be a no-op.
 
-#### Scenario: Result record includes required fields
+#### Scenario: Record includes required fields
 - **WHEN** an audit logger is installed and a dispatched tool invocation completes or is denied
 - **THEN** the appended result record includes timestamp, phase, tool name, arguments, success, request id, action id, decision, and session id when available
 
@@ -77,18 +77,18 @@ The system SHALL support appending structured audit records for dispatched tool 
 - **WHEN** middleware records both phases of one invocation
 - **THEN** the records have the same request id, action id, tool, arguments, and optional session id
 
-#### Scenario: No logger is a durable-storage no-op
+#### Scenario: No logger is a no-op
 - **WHEN** no audit logger is present in the active security context
 - **THEN** no audit file is written and no audit-storage error is raised
 
 ### Requirement: Context-scoped active policy
 The project policy used by product tool and guard evaluation SHALL be the policy snapshot stored in the active security context. A valid context whose policy value is absent SHALL apply built-in defaults (no extra command denials/allowlist and no extra denied paths from project policy). Installing and resetting the security context SHALL install and reset that policy snapshot together with the workspace, confirmation, tracker, session, and audit state.
 
-#### Scenario: Valid context with no project policy uses built-in defaults
+#### Scenario: No installed policy uses built-in defaults
 - **WHEN** an active valid security context contains no project policy
 - **THEN** command policy checks impose no extra deny/allow list beyond built-in classifier and confirmation behavior
 
-#### Scenario: Context policy is visible to all product evaluators
+#### Scenario: Installed policy is visible to evaluators
 - **WHEN** a valid context contains a loaded project policy
 - **THEN** command and path evaluations for each dispatched action use that snapshot until the context is cleaned up
 

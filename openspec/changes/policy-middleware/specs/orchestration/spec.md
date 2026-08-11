@@ -50,7 +50,7 @@ When `run_council` runs against a project with an initialized sandbox, it SHALL 
 - **WHEN** `run_council` completes or fails
 - **THEN** no active security context exposes that run's audit logger
 
-#### Scenario: No sandbox skips durable evidence
+#### Scenario: No sandbox skips audit install
 - **WHEN** `run_council` runs without an initialized sandbox
 - **THEN** its security context has no session writer or audit logger, the run still proceeds, middleware still tracks in memory, and no audit/session files are created
 
