@@ -17,11 +17,11 @@
 
 ## 3. Trust CLI foundation
 
-- [ ] 3.1 Add `council trust grant` with strict action, JSON resource, repeatable scope, and optional aware expiry inputs.
-- [ ] 3.2 Add authenticated `council trust revoke` and `council trust list` with non-zero fail-closed diagnostics and no command-line secret input.
-- [ ] 3.3 Keep trust CLI provider-independent and disconnected from middleware, Trust Tier runtime, `--trust-tier`, confirmation, and `--yes`.
-- [ ] 3.4 Add CLI tests for success across invocations, missing verifier, scope/auth mismatch, invalid input/store, masked output/audit, revoke/list, project workspace bypass, and unchanged product-tool decisions.
-- [ ] 3.5 Run CLI-focused tests and full `uv run pytest` before documentation/evidence work.
+- [x] 3.1 Add `council trust grant` with strict action, JSON resource, repeatable scope, and optional aware expiry inputs.
+- [x] 3.2 Add authenticated `council trust revoke` and `council trust list` with non-zero fail-closed diagnostics and no command-line secret input.
+- [x] 3.3 Keep trust CLI provider-independent and disconnected from middleware, Trust Tier runtime, `--trust-tier`, confirmation, and `--yes`.
+- [x] 3.4 Add CLI tests for success across invocations, missing verifier, scope/auth mismatch, invalid input/store, masked output/audit, revoke/list, project workspace bypass, and unchanged product-tool decisions.
+- [x] 3.5 Run CLI-focused tests and full `uv run pytest` before documentation/evidence work.
 
 ## 4. Documentation and evidence
 
