@@ -21,6 +21,14 @@ class WorkspaceGuardError(Exception):
     """Raised when a path violates workspace boundary or denylist rules."""
 
 
+class WorkspaceBoundaryError(WorkspaceGuardError):
+    """Raised when a path resolves outside the workspace root."""
+
+
+class DeniedPathError(WorkspaceGuardError):
+    """Raised when a path matches a built-in or active-policy deny pattern."""
+
+
 class WorkspaceGuard:
     """Validates paths and working directories against a workspace root."""
 
@@ -39,12 +47,21 @@ class WorkspaceGuard:
 
     def resolve(self, path: str) -> Path:
         """Resolve and validate a path within the workspace."""
-        candidate = Path(path)
-        if candidate.is_absolute():
-            resolved = candidate.resolve(strict=False)
-        else:
-            resolved = (self.root / candidate).resolve(strict=False)
+        return self.resolve_from(self.root, path)
 
+    def resolve_from(self, cwd: Path, path: str) -> Path:
+        """Resolve an operand relative to an already validated execution cwd."""
+
+        resolved_cwd = cwd.resolve(strict=False)
+        self._ensure_within_root(resolved_cwd)
+        self._ensure_not_denied(resolved_cwd)
+
+        candidate = Path(path)
+        resolved = (
+            candidate.resolve(strict=False)
+            if candidate.is_absolute()
+            else (resolved_cwd / candidate).resolve(strict=False)
+        )
         self._ensure_within_root(resolved)
         self._ensure_not_denied(resolved)
         return resolved
@@ -58,7 +75,7 @@ class WorkspaceGuard:
     def _ensure_within_root(self, resolved: Path) -> None:
         if resolved == self.root or resolved.is_relative_to(self.root):
             return
-        raise WorkspaceGuardError(
+        raise WorkspaceBoundaryError(
             f"Path is outside workspace root ({self.root}): {resolved}"
         )
 
@@ -88,7 +105,7 @@ class WorkspaceGuard:
         for pattern in self._effective_denied_patterns():
             if self._matches_pattern(posix, pattern):
                 display = posix or "."
-                raise WorkspaceGuardError(f"Access denied for sensitive path: {display}")
+                raise DeniedPathError(f"Access denied for sensitive path: {display}")
 
     @staticmethod
     def _matches_pattern(posix_path: str, pattern: str) -> bool:

@@ -49,6 +49,6 @@ def test_run_command_rejects_cwd_outside_workspace() -> None:
 
 def test_run_command_defaults_to_workspace_root(tmp_path: Path) -> None:
     (tmp_path / "marker.txt").write_text("here", encoding="utf-8")
-    result = run_command("python -c \"import os; print(os.path.exists('marker.txt'))\"")
+    result = run_command("cat marker.txt")
     assert result.success
-    assert result.output == "True"
+    assert result.output == "here"

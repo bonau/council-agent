@@ -6,7 +6,12 @@ from pathlib import Path
 
 import pytest
 
-from council_agent.sandbox.workspace import WorkspaceGuard, WorkspaceGuardError
+from council_agent.sandbox.workspace import (
+    DeniedPathError,
+    WorkspaceBoundaryError,
+    WorkspaceGuard,
+    WorkspaceGuardError,
+)
 from council_agent.security import CouncilPolicy, active_policy
 
 
@@ -124,6 +129,63 @@ def test_resolve_cwd_inside_workspace(guard: WorkspaceGuard, tmp_path: Path) -> 
 def test_resolve_cwd_outside_workspace_blocked(guard: WorkspaceGuard) -> None:
     with pytest.raises(WorkspaceGuardError, match="outside workspace"):
         guard.resolve_cwd("..")
+
+
+def test_resolve_operand_relative_to_validated_cwd(
+    guard: WorkspaceGuard,
+    tmp_path: Path,
+) -> None:
+    nested = tmp_path / "nested"
+    nested.mkdir()
+    target = nested / "item.txt"
+    target.write_text("ok", encoding="utf-8")
+    assert guard.resolve_from(nested.resolve(), "item.txt") == target.resolve()
+
+
+def test_resolve_absolute_operand_from_validated_cwd(
+    guard: WorkspaceGuard,
+    tmp_path: Path,
+) -> None:
+    nested = tmp_path / "nested"
+    nested.mkdir()
+    target = tmp_path / "item.txt"
+    target.write_text("ok", encoding="utf-8")
+    assert guard.resolve_from(nested.resolve(), str(target)) == target.resolve()
+
+
+def test_resolve_operand_traversal_from_nested_cwd_is_blocked(
+    guard: WorkspaceGuard,
+    tmp_path: Path,
+) -> None:
+    nested = tmp_path / "nested"
+    nested.mkdir()
+    with pytest.raises(WorkspaceBoundaryError, match="outside workspace"):
+        guard.resolve_from(nested.resolve(), "../../outside.txt")
+
+
+def test_resolve_operand_denied_path_has_typed_error(
+    guard: WorkspaceGuard,
+) -> None:
+    with pytest.raises(DeniedPathError, match="denied"):
+        guard.resolve_from(guard.root, ".env")
+
+
+def test_resolve_operand_symlink_escape_from_cwd_is_blocked(
+    guard: WorkspaceGuard,
+    tmp_path: Path,
+) -> None:
+    nested = tmp_path / "nested"
+    nested.mkdir()
+    outside = tmp_path.parent / f"{tmp_path.name}-operand-sentinel.txt"
+    outside.write_text("secret", encoding="utf-8")
+    link = nested / "escape"
+    link.symlink_to(outside)
+    try:
+        with pytest.raises(WorkspaceBoundaryError, match="outside workspace"):
+            guard.resolve_from(nested.resolve(), "escape")
+    finally:
+        link.unlink(missing_ok=True)
+        outside.unlink(missing_ok=True)
 
 
 def test_guard_rejects_nonexistent_root(tmp_path: Path) -> None:
