@@ -506,3 +506,10 @@ alpha 才開始實作 Trust Tier 0/1/2 runtime；本紀錄中的 v0.9.x 工作�
   - Trust Tier 0/1/2 runtime 與 `council trust` 仍只屬 v1.0-alpha。
 - 文件影響：README、known issues、v0.9.x handoff 與本 learning log 更新；feature branch 不 bump version。
 - 下一步：完成 docs regression，sync security／tools／orchestration delta，strict validate，archive，再執行 post-archive `./scripts/check.sh`。
+
+### 2026-08-11 17:32 UTC — v0.9.2 tagged
+
+- 狀態：通過
+- 基準：tag `v0.9.2`、PR #9
+- 驗證：315 passed
+- 下一步：v0.9.3 `policy-trust-boundary`
