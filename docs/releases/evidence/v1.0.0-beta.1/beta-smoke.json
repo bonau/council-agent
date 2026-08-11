@@ -1,0 +1,15 @@
+{
+  "package": "1.0.0a1",
+  "commit": "dd4d99fe9135ac255601e43f0e6a6ea2279e12b9",
+  "tag_baseline": "v1.0.0-alpha.1",
+  "cases": {
+    "TIER0-READ-REFUSE": "PASS",
+    "TIER1-WRITE-COMPAT": "PASS",
+    "TIER1-GRANT-SKIP": "PASS",
+    "SHELL-UNSUPPORTED": "PASS",
+    "SHELL-METACHAR": "PASS",
+    "CLI-TRUST-TIER": "PASS",
+    "SENTINEL": "PASS"
+  },
+  "all_pass": true
+}
