@@ -35,7 +35,7 @@
 - [x] 5.1 Run `uv run pytest`.
 - [x] 5.2 Run `npx @fission-ai/openspec@latest validate --changes --strict`.
 - [x] 5.3 Sync the four delta specs into `openspec/specs/` and run `npx @fission-ai/openspec@latest validate --specs --strict`.
-- [ ] 5.4 Run `./scripts/check.sh` with the active change and record the test/spec counts in the evidence and learning log.
+- [x] 5.4 Run `./scripts/check.sh` with the active change and record the test/spec counts in the evidence and learning log.
 - [ ] 5.5 Archive `evidence-closure` to the dated archive path and update evidence/handoff with that exact path.
 - [ ] 5.6 Run post-archive `./scripts/check.sh`, confirm zero active changes, and record final test/spec counts.
 - [ ] 5.7 Commit and push the completed feature branch without changing package version files.
