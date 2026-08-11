@@ -41,17 +41,6 @@ from council_agent.security.confirm import (
     resolve_cli_confirm_mode,
     set_confirmation_policy,
 )
-from council_agent.security.middleware import (
-    POLICY_VERSION_UNVERSIONED,
-    SUPPORTED_TOOL_NAMES,
-    SecurityContext,
-    SecurityContextError,
-    SecurityContextReason,
-    get_security_context,
-    invoke,
-    require_security_context,
-    security_context,
-)
 from council_agent.security.policy import (
     POLICY_FILENAME,
     CouncilPolicy,
@@ -68,6 +57,17 @@ from council_agent.security.policy import (
     policy_path,
     reset_active_policy,
     set_active_policy,
+)
+from council_agent.security.middleware import (
+    POLICY_VERSION_UNVERSIONED,
+    SUPPORTED_TOOL_NAMES,
+    SecurityContext,
+    SecurityContextError,
+    SecurityContextReason,
+    get_security_context,
+    invoke,
+    require_security_context,
+    security_context,
 )
 
 __all__ = [
