@@ -7,7 +7,7 @@ Before inviting public beta testers, the project SHALL publish human and Agent t
 - **WHEN** a human or Agent tester opens `docs/index.md`
 - **THEN** they can reach the public testing handbook, manual cases, Agent checklist, smoke suite design, known-issues list, and issue template
 
-#### Scenario: Current boundaries are explicit
+#### Scenario: Shell and confirmation limitations are explicit
 - **WHEN** testers read the public testing handbook, smoke suite, manual cases, or known-issues list
 - **THEN** the docs distinguish current fail-closed and evidence behavior from historical v0.9.0 expected failures and explicitly retain the OS-sandbox, hostile project-code, external audit anchoring, and pre-Trust-Tier limitations
 
