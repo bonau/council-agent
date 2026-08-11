@@ -730,3 +730,10 @@ alpha 才開始實作 Trust Tier 0/1/2 runtime；本紀錄中的 v0.9.x 工作�
 - 文件影響：known issues關閉V1-008的store scope、handoff新增v0.9.7狀態、security/orchestration deltas與本learning log；不宣稱完整Trust Tier。
 - Archive：25/25 tasks complete；security/orchestration delta已同步；change移至`openspec/changes/archive/2026-08-11-trust-grant-store/`。
 - 下一步：合併feature PR；之後只在`release/0.9.7`做版本 bump／tag。下一個清債change是v0.9.8 `trust-decision-matrix`，仍不得啟用Trust Tier runtime。
+
+### 2026-08-11 19:24 UTC — v0.9.7 tagged
+
+- 狀態：通過
+- 基準：tag `v0.9.7`
+- 驗證：498 passed
+- 下一步：v0.9.8 trust-decision-matrix
