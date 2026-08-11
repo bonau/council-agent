@@ -745,6 +745,11 @@ def run(
         f"\n[bold]Verdict:[/bold] [{status_style}]{result.verdict.status.value}[/]"
     )
     console.print(f"[bold]Summary:[/bold] {result.verdict.summary}")
+    if result.final_attempt_id is not None:
+        console.print(f"[bold]Final attempt:[/bold] {result.final_attempt_id}")
+        console.print(f"[bold]Attempts:[/bold] {len(result.attempts)}")
+    if result.stop_reason is not None:
+        console.print(f"[bold]Stop reason:[/bold] {result.stop_reason.value}")
     if result.escalated:
         console.print("[bold yellow]Escalation:[/bold yellow] applied")
 

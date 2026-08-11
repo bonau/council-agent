@@ -32,11 +32,12 @@
 
 - [ ] 測試在一次性、非特權環境執行。
 - [ ] 未使用正式資料或真實長效憑證。
-- [ ] 已知 shell 只驗證 `cwd`，不是真 sandbox。
+- [ ] 已知 shell 是受限 simple-command／argv／path-operand boundary，但仍不是真 OS sandbox；`run_tests` project code 不受 OS containment。
 - [ ] 未把 `ConfirmMode` 當成 Trust Tier，也未把 `--yes` 當成完整授權。
-- [ ] 已檢查 classifier 未知指令可能 fail-open 為 `read`。
-- [ ] 已考慮 project policy 可被 Agent 修改。
-- [ ] 已知 audit 無 hash chain、無可靠 secret redaction。
+- [ ] 已檢查 classifier 對未知／混淆／複合形式 fail-closed，且未把拒絕當 PASS。
+- [ ] 已考慮 project policy 僅能縮權；product tools 禁止直接改 policy，但 host／external／test process 不在此邊界。
+- [ ] 已知 audit 有 redaction、sequence、canonical event ID 與 exact correlation，但無 predecessor-linked／external anchor。
+- [ ] 已知 grant store foundation 尚未接產品 tool，Trust Tier 0/1/2 runtime 尚未實作。
 
 ## 問題摘要
 
@@ -85,7 +86,7 @@
 
 - Evidence 路徑或私人附件：
 - Workspace diff：
-- Audit／session correlation ID：
+- Pipeline attempt／request／action／session correlation ID：
 - Audit event 範圍：
 - 螢幕截圖或錄影：
 - 可重現次數：`N/N`

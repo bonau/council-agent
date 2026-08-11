@@ -1,9 +1,10 @@
 schema_version: "1.0"
-document_status: draft
+document_status: v0.9.9-feature-candidate
 language: zh-Hant
 baseline:
-  package_version: "0.9.0"
-  phase: "v1.0 準備階段"
+  package_version: "0.9.8"
+  feature_candidate: "v0.9.9 evidence-closure; package bump deferred to release branch"
+  phase: "v0.9.x implementation 清債完成；停止於 v1.0-alpha change 前"
   alpha_prerequisites:
     - "v0.9.1"
     - "v0.9.2"
@@ -16,11 +17,13 @@ baseline:
     - "v0.9.9"
 
 safety_facts:
-  shell_containment: "shell 只驗證 cwd，不是真 sandbox"
+  shell_containment: "受限 simple-command + argv + path operands fail-closed；仍不是真 OS sandbox，run_tests project code 不受 containment"
   confirmation: "ConfirmMode 不等於 Trust Tier；--yes 不等於完整授權"
-  unknown_command: "classifier 未知指令 fail-open 為 read"
-  project_policy: "council.policy.yaml 位於 Agent 可修改的 project boundary"
-  audit: "audit 無 hash chain、無可靠 secret redaction"
+  unknown_command: "classifier 對未知、無法解析、混淆與複合指令 fail-closed"
+  project_policy: "council.policy.yaml 是 restrict-only；product tools 保護其 path，但 host/external/test code 不受 OS containment"
+  audit: "recursive redaction + sequence + canonical per-event ID + exact correlation；無 predecessor-linked/external anchor"
+  trust: "grant store foundation 與 matrix-v1 已存在；persisted grant 未接 product tools，沒有 Tier 0/1/2 runtime"
+  verification: "每次 escalation 重新 Verification；必要 tool/test evidence 缺失或跨 attempt 時 FAIL"
 
 environment:
   disposable: true
@@ -131,8 +134,8 @@ cases:
     title: "Dangerous 與未知指令分類"
     required: true
     network: false
-    current_expectation: FAIL
-    expected_failure_issue: V1-001
+    current_expectation: PASS
+    closed_issue: V1-001
     assertions:
       - "dangerous 指令被拒絕"
       - "未知與無法解析指令應 fail-closed"
@@ -142,8 +145,8 @@ cases:
     title: "Shell boundary 與 run_tests quoting"
     required: true
     network: false
-    current_expectation: FAIL
-    expected_failure_issue: V1-002
+    current_expectation: PASS
+    closed_issue: V1-002
     assertions:
       - "shell 不得寫入 workspace 外"
       - "含空白路徑不產生語意漂移"
@@ -154,12 +157,26 @@ cases:
     title: "Audit 顯示、遮罩與完整性"
     required: true
     network: false
-    current_expectation: FAIL
-    expected_failure_issue: V1-005
+    current_expectation: PASS
+    closed_issue: V1-005
     assertions:
       - "show 與 export 可重現"
       - "秘密被遮罩"
-      - "sequence、gap 與 hash chain 可驗證"
+      - "sequence、gap、canonical per-event identity 與 exact correlation 可驗證"
+      - "文件不把 per-event integrity substrate 宣稱為 externally anchored hash chain"
+
+  - id: SMK-09
+    source: smoke-suite.md
+    title: "Verification/escalation attempt evidence closure"
+    required: true
+    network: false
+    current_expectation: PASS
+    closed_issue: V1-010/SEC-P1-002
+    assertions:
+      - "每次 escalation 後用原成功標準重新 Verification"
+      - "retry exhaustion 的最終 verdict 保持 FAIL"
+      - "final output、verdict、tool/decision/audit evidence 同屬 final attempt"
+      - "必要 tool/test evidence 缺失、失敗、malformed 或 cross-attempt 時不能 PASS"
 
   - id: LIVE-01
     source: smoke-suite.md
@@ -173,7 +190,8 @@ cases:
       - "所有 P0 已關閉"
       - "取得 release lead 核准與一次性低額 provider key"
     assertions:
-      - "Planning、Execution、Verification 可完成"
+      - "Planning、Execution、Verification 與必要時 escalation/re-verification 可完成"
+      - "final output、verdict 與 attempt evidence 對齊"
       - "憑證未出現在 console、session、audit 或 evidence"
 
   - id: MAN-03
@@ -198,46 +216,52 @@ cases:
 
   - id: MAN-08
     source: manual-test-cases.md
-    title: "真人重現 classifier fail-open"
+    title: "真人驗證 principal/scope current authority"
     required: true
     network: false
-    current_expectation: FAIL
-    expected_failure_issue: V1-001
+    current_expectation: PASS
     assertions:
-      - "未知指令不應預設分類為 read"
+      - "scope 不足與 resolver revoke 在下一 action fail-closed"
 
   - id: MAN-09
     source: manual-test-cases.md
-    title: "真人重現 shell 越界寫入"
+    title: "真人驗證 high-risk fresh step-up"
     required: true
     network: false
-    current_expectation: FAIL
-    expected_failure_issue: V1-001
+    current_expectation: PASS
     assertions:
-      - "只驗證 cwd 不足以構成 sandbox"
-      - "外部 probe 不應建立"
+      - "missing/expired/replay/binding mismatch proof 拒絕"
+      - "--yes 不可取代 authentication"
 
   - id: MAN-10
     source: manual-test-cases.md
-    title: "真人驗證 project policy 可修改"
+    title: "真人驗證 user-owned grant store"
     required: true
     network: false
-    current_expectation: FAIL
-    expected_failure_issue: V1-004
+    current_expectation: PASS
     assertions:
-      - "Agent 不得修改可信授權來源"
-      - "project policy 不可被當成 grant"
+      - "store 位於 workspace 外且 owner-only"
+      - "persistent revoke 生效；project policy 不可被當成 grant"
 
   - id: MAN-12
     source: manual-test-cases.md
-    title: "真人驗證 audit 限制"
+    title: "真人驗證 matrix-v1 precedence"
     required: true
     network: false
-    current_expectation: FAIL
-    expected_failure_issue: V1-005
+    current_expectation: PASS
     assertions:
-      - "假 secret marker 應被遮罩"
-      - "事件應具 sequence 與 hash chain"
+      - "policy→scope→authentication→grant→risk→interaction precedence 固定"
+      - "AUTO/approved 不創造 authority"
+
+  - id: MAN-14
+    source: manual-test-cases.md
+    title: "真人驗證 escalation re-verification 與 attempt closure"
+    required: true
+    network: false
+    current_expectation: PASS
+    assertions:
+      - "final attempt 選取一致且舊 evidence 保留"
+      - "required pytest evidence 缺失時 model PASS 被轉成 FAIL"
 
 cleanup:
   revoke_ephemeral_credentials: true

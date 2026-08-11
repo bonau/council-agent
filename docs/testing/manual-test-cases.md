@@ -1,6 +1,52 @@
 # v1.0 準備階段真人測試案例
 
-> 基線：v0.9.0。這些案例必須在 [`v1.0-beta-public-testing.md`](v1.0-beta-public-testing.md) 定義的一次性隔離環境執行。v0.9.0 的部分安全案例**預期失敗**；預期失敗仍記為 `FAIL`，不能算 release gate 通過。
+> 已發佈基線：v0.9.8；current feature candidate：v0.9.9（package metadata 尚未 bump）。案例必須在 [`v1.0-beta-public-testing.md`](v1.0-beta-public-testing.md) 定義的一次性隔離環境執行。Current candidate 的 MAN-01～MAN-14 都必須實際 PASS；後段 v0.9.0 詳細重現只作歷史紀錄，**不得照舊執行或當成 current expectation**。
+
+## Current candidate 執行矩陣
+
+先固定 candidate commit，確認 working tree 乾淨，依序執行：
+
+```bash
+cd /workspace
+git rev-parse HEAD
+uv sync --extra dev
+uv run council --help
+uv run pytest -q tests/test_cli_sandbox.py
+uv run pytest -q tests/test_tools_filesystem.py tests/test_workspace_guard.py
+uv run pytest -q tests/test_shell_containment.py tests/test_tools_run_tests.py
+uv run pytest -q tests/test_policy.py tests/test_policy_middleware.py
+uv run pytest -q tests/test_principal_middleware.py
+uv run pytest -q tests/test_session_auth_e2e.py tests/test_session_auth_middleware.py
+uv run pytest -q tests/test_trust_grant_store.py tests/test_trust_grant_management.py
+uv run pytest -q tests/test_trust_decision_matrix.py tests/test_trust_decision_middleware.py
+uv run pytest -q tests/test_audit.py tests/test_cli_audit.py
+uv run pytest -q tests/test_orchestrator.py tests/test_verification_evidence.py \
+  tests/test_verification_integration.py tests/test_sandbox_e2e.py
+./scripts/check.sh
+```
+
+| ID | Current 主題 | 必須結果 | 主要可重現來源 |
+|---|---|---|---|
+| MAN-01 | sandbox init／status | PASS | `test_cli_sandbox.py` |
+| MAN-02 | dispatcher-backed filesystem CRUD | PASS | `test_tools_filesystem.py` |
+| MAN-03 | traversal／symlink／control-plane path 拒絕 | PASS | `test_workspace_guard.py`、`test_shell_containment.py` |
+| MAN-04 | strict restrict-only project policy | PASS | `test_policy.py`、`test_policy_middleware.py` |
+| MAN-05 | confirmation interaction | PASS | `test_confirmation.py`、`test_filesystem_confirmation.py` |
+| MAN-06 | dangerous／unknown／compound command fail-closed | PASS | `test_command_classifier.py`、`test_shell_containment.py` |
+| MAN-07 | `--yes` 只控制 interaction | PASS | `test_trust_decision_entrypoints.py` |
+| MAN-08 | principal／scope current authority | PASS | `test_principal_middleware.py` |
+| MAN-09 | high-risk fresh step-up | PASS | `test_session_auth_e2e.py` |
+| MAN-10 | workspace 外 user-owned grant store／persistent revoke | PASS | `test_trust_grant_store.py` |
+| MAN-11 | audit show／export／redaction／integrity | PASS | `test_audit.py`、`test_cli_audit.py` |
+| MAN-12 | matrix-v1 precedence，ConfirmMode 與 authority 分離 | PASS | `test_trust_decision_matrix.py` |
+| MAN-13 | `run_tests` argv／special path／injection boundary | PASS | `test_tools_run_tests.py`、`test_pytest_args.py` |
+| MAN-14 | escalation re-verification／attempt evidence closure | PASS | `test_orchestrator.py`、`test_verification_evidence.py`、`test_sandbox_e2e.py` |
+
+每個 targeted command 都要記錄 commit、exit code、passed count 與 stderr；`./scripts/check.sh` 必須在同一 commit 通過。MAN-14 另檢查 retry exhaustion 最終仍 FAIL、missing test evidence 強制 FAIL、final attempt ID 與 tracker/session/audit metadata 一致，以及舊 attempt evidence 保留。
+
+現有 product tools 必須在顯式 `SecurityContext` 與 Council principal 下使用；舊 `active_policy(...)`／`confirmation_policy(...)` ambient 範例不再是 public product 路徑。需要手寫 probe 時，依 README 的 library API 建立完整 context，且只能在一次性 workspace 使用假資料。
+
+## 歷史 v0.9.0 重現紀錄（不可作 current 操作手冊）
 
 ## 共用前置條件
 

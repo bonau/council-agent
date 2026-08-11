@@ -1,26 +1,26 @@
 # Council Agent
 
-OpenRouter + CrewAI 三階段 CLI 框架：每次推論依序經過 **計劃 → 執行 → 校驗** 三個小隊，校驗失敗時由 escalation 角色接手困難段落。
+OpenRouter + CrewAI 三階段 CLI 框架：每次推論依序經過 **計劃 → 執行 → 校驗** 三個小隊；校驗失敗時由 escalation 角色修正，並以原成功標準重新校驗。
 
 ## 功能
 
 - 三階段 Crew 管線（Planning / Execution / Verification）
 - 內建兩組模型 Preset，全部透過 OpenRouter 路由
 - Typer CLI 介面，支援 `--verbose`、`--workspace`、`--yes`、`council sandbox` 與 `council audit` 子命令
-- 校驗失敗時自動 escalation（可設定 `max_retries`）
+- 校驗失敗時最多依 `max_retries` escalation；每次修正都有獨立 attempt ID 並重新 Verification，耗盡仍失敗時保持 FAIL
 - Tool 基礎層：`read_file`、`write_file`、`list_dir`、`delete_file`、`run_command`、`run_tests`
 - Execution Crew 掛載上述 tools，可在工作區內實際改檔與跑測試
 - `WorkspaceGuard`：filesystem tools、`run_command` 的 cwd 與受支援命令路徑運算元都驗證工作區、敏感路徑及 symlink 邊界
 - 指令分析：明確支援的 simple-command registry 分類為 `read` / `write` / `dangerous`；未知、混淆或無法解析的形式 fail-closed
 - 互動確認：危險／寫入 shell 與 `write_file`／`delete_file` 在 CLI 執行時需確認；`--yes` 跳過確認（**不是** Trust Tier 或已驗證授權）；無 TTY 預設拒絕
 - 唯一 Policy Middleware：所有 public tool／CrewAI 呼叫經同一 dispatcher 與單一 `SecurityContext`；缺少或已 cleanup 的 context fail-closed
-- 結構化審計日誌：sandbox 已初始化時，middleware 對每個 tool action 寫入 correlated attempt／result 至 `.council/audit/events.jsonl`；可用 `council audit show`／`export`（尚無 hash chain／secret redaction）
+- 結構化審計日誌：sandbox 已初始化時，middleware 對每個 tool action 寫入 redacted、sequenced、canonical-ID 的 correlated attempt／result 至 `.council/audit/events.jsonl`；可用 `council audit show`／`export`（這是 per-event integrity substrate，尚無 predecessor-linked／externally anchored hash chain）
 - 專案政策檔：可選根目錄 `council.policy.yaml`，必須使用 `schema_version: 1`；它是 project-owned、restrict-only 輸入，未知／拼錯／授權型欄位與未支援版本會 fail-fast
 - Tool 呼叫追蹤與 `max_tool_calls` 上限（預設 50）
-- Verification 可接收結構化 tool 執行摘要（含 pytest 結果）
+- Verification 只使用同一 pipeline attempt 的結構化 tool evidence；成功條件要求 tool／pytest 時，缺少 correlation、exit code 或成功計數不得 PASS
 - 可選 `.council/` sandbox：session 紀錄（`meta.json` + `tools.jsonl`）與跨 session 審計（`audit/events.jsonl`）
 
-> **安全提示**：`run_command` 只接受下述受限 simple grammar，並使用 argv + `shell=False`；這是 command boundary 強化，**不是** OS／容器級 sandbox。v0.9.2 已建立唯一 tool dispatcher，但 `ConfirmMode`／`--yes` **不等於** Trust Tier。`council.policy.yaml` 只能加限制，不能授權或提權；受控 filesystem tools 與已建模 shell path action 也預設禁止直接存取政策檔。這仍無法阻止 `run_tests` 執行的惡意專案程式碼、host user 或外部程序改檔。系統仍**不是**完整信任框架（尚無 Trust Tier、`council trust`、principal／scope、authentication、user-owned grant store、audit hash chain）。請僅在信任的專案目錄與可丟棄環境使用，並避免將不受信任的 prompt 直接餵給 Agent。v1.0 前清債與測試文件見 [docs/index.md](docs/index.md)、[ROADMAP.md](ROADMAP.md)。
+> **安全提示**：`run_command` 只接受下述受限 simple grammar，並使用 argv + `shell=False`；這是 command boundary 強化，**不是** OS／容器級 sandbox。現有 mandatory dispatcher 已分離 project policy、principal scopes、high-risk step-up authentication、user-owned trust grant store foundation、matrix-v1 decision 與互動確認；但 persisted grant 尚未接到產品 tool，且沒有 Trust Tier 0/1/2 runtime／`--trust-tier`。`council.policy.yaml` 只能加限制；受控 filesystem tools 與已建模 shell path action 預設禁止直接存取控制面。這仍無法阻止 `run_tests` 執行的惡意專案程式碼、host user 或外部程序改檔，audit 也不是 externally anchored hash chain。請僅在信任的專案目錄與可丟棄環境使用。v1.0 前清債與測試文件見 [docs/index.md](docs/index.md)、[ROADMAP.md](ROADMAP.md)。
 
 ## Presets
 
@@ -162,7 +162,7 @@ denied_paths:
 
 Schema version 1 只接受 `schema_version` 與上列三個限制欄位，且型別採 strict validation。缺少／非整數／未支援的 version、未知欄位、拼錯欄位（例如 `denied_command`）及 `trust_tier`、`grant`、`scope` 等授權型欄位都會在 session、context、crew 建立前拒絕整份檔案；不會只套用認得的部分。錯誤會指出檔案與欄位，但不回顯欄位值。
 
-從舊 v0.9 unversioned policy 遷移時，加入 `schema_version: 1`，並移除所有不在範例中的欄位；不提供靜默相容模式。未來 user-owned trust grant store 會使用 workspace 外、不同權限與載入 API 的邊界（規劃於 v0.9.7），本版未實作 grant store。
+從舊 v0.9 unversioned policy 遷移時，加入 `schema_version: 1`，並移除所有不在範例中的欄位；不提供靜默相容模式。User-owned trust grant store 已使用 workspace 外、不同權限與載入 API 的邊界；project policy 仍不能建立或修改 grant。
 
 `council.policy.yaml` 與巢狀同名 policy 檔預設在 `WorkspaceGuard` denied paths 內，project policy 也不能移除這項 built-in 保護。這會阻擋 public filesystem tools 及受支援、可辨識路徑的 shell action 直接讀寫／刪除政策檔；不代表 OS confinement，尤其 `run_tests` 仍會執行可任意操作 host 權限範圍的專案程式碼。
 
@@ -186,7 +186,19 @@ Policy 在 command analysis 與路徑驗證後、confirmation 前套用。`run_c
 
 Local principal設定與session UUID本身仍不是authentication。v0.9.6的產品orchestrator會對需要`high-risk:manage`的action要求fresh step-up：`COUNCIL_AUTH_SECRET`作為獨立service/test verifier，產生綁定principal、workspace、runtime session、purpose、exact action與期限的one-use challenge/token。Missing、expired、revoked、replayed或錯綁定proof都在policy／confirmation／handler前fail closed；`--yes`只選confirmation auto，不能取代authentication。
 
-Authentication state只存在process memory，restart會使outstanding challenge/token失效；raw verifier、challenge、response與token不寫入audit、session或console。Direct library `SecurityContext`為相容性預設不啟用step-up requirement，可明確設定`require_high_risk_step_up=True`。Persistent user-owned grant/revoke store與Trust Tier runtime仍分別留待v0.9.7與v1.0。
+Authentication state只存在process memory，restart會使outstanding challenge/token失效；raw verifier、challenge、response與token不寫入audit、session或console。Direct library `SecurityContext`為相容性預設不啟用step-up requirement，可明確設定`require_high_risk_step_up=True`。
+
+### Trust grant store、decision matrix 與停止線
+
+`council trust grant/revoke/list` 管理 workspace 外的 user-owned schema-v1 store。Store 會驗證 owner-only 權限、non-symlink／workspace non-overlap、strict records、atomic replace 與 persistent revoke；管理操作需要獨立 fresh authentication。這是 grant 管理基礎，不代表產品 tool 已消費 grant。
+
+每個產品 tool action 由 dispatcher 產生 matrix-v1 `trust_decision`，固定依 policy → scope → authentication → grant → risk → interaction 判定，並在 result、tracker、session 與 audit 保留相同 normalized evidence。v0.9.x runtime 固定 grant 為 `trust_grant_not_required`；Tier 0/1/2 source、grant lookup、tier translator 與 `--trust-tier` 只屬後續獨立 v1.0-alpha change。
+
+### Verification／Escalation evidence
+
+Initial execution 與每次 escalation 都有唯一 `pipeline_attempt_id`。同一 attempt 的 output、tool summaries、policy／authorization decisions、test exit code、session／audit correlation 與 Verification verdict 一起保留；escalation 後一定用原 plan／success criteria 重新驗證。`max_retries` 耗盡仍未通過時最終 verdict 保持 FAIL，舊 attempt evidence 不會被新輸出覆寫。
+
+Verification 的 evidence floor 是保守 lexical rule，不是任意語意的形式證明：明確要求 product tool 或 pytest 的 request／plan／success criteria，必須有當次 attempt 的 matching summary；pytest 另須 `exit_code=0`、`failed=0`。純文字任務不會被強制捏造 tool evidence。
 
 ## 環境變數
 
@@ -224,7 +236,8 @@ User Prompt
     → Planning Crew   (結構化計劃)
     → Execution Crew  (依計劃執行)
     → Verification Crew (PASS / FAIL)
-    → Escalation (FAIL 時接手)
+    → Escalation (FAIL 且尚有 retry 時接手)
+    → Verification Crew (以同一成功標準重新驗證)
     → Final Output
 ```
 

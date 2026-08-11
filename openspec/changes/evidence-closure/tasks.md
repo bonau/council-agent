@@ -19,15 +19,15 @@
 - [x] 3.3 Replace the single escalation branch with a bounded retry loop that re-verifies every new execution against the original plan and retains every attempt.
 - [x] 3.4 Make legacy final output/execution/verdict fields and new final attempt/stop reason select the same last attempt.
 - [x] 3.5 Add integration tests for initial PASS, escalation PASS, repeated FAIL/retry exhaustion, zero retries, tool evidence retention, and final-attempt alignment.
-- [ ] 3.6 Run `uv run pytest` and record the all-green phase result before documentation work.
+- [x] 3.6 Run `uv run pytest` and record the all-green phase result before documentation work.
 
 ## 4. End-to-end evidence and document correction
 
-- [ ] 4.1 Add an end-to-end sandbox orchestration test covering attempt-scoped tracker/session/audit evidence and fail-closed missing test evidence.
-- [ ] 4.2 Correct `README.md` and `ROADMAP.md` capability/limitation claims without version bump or Trust Tier runtime claims.
-- [ ] 4.3 Close V1-010／SEC-P1-002 and V1-011 documentation debt with accurate residual limitations in known issues and the learning log.
-- [ ] 4.4 Correct public testing handbook, manual cases, smoke suite, issue template/index references to the actual v0.9.9 candidate boundary.
-- [ ] 4.5 Create `docs/releases/v0.9.9-evidence-closure-evidence.md` and update `docs/releases/v0.9.x-handoff.md` with the explicit v0.9.1–v0.9.9 completion/stop statement, branch, tests, archive plan, and release-branch-only version bump.
+- [x] 4.1 Add an end-to-end sandbox orchestration test covering attempt-scoped tracker/session/audit evidence and fail-closed missing test evidence.
+- [x] 4.2 Correct `README.md` and `ROADMAP.md` capability/limitation claims without version bump or Trust Tier runtime claims.
+- [x] 4.3 Close V1-010／SEC-P1-002 and V1-011 documentation debt with accurate residual limitations in known issues and the learning log.
+- [x] 4.4 Correct public testing handbook, manual cases, smoke suite, issue template/index references to the actual v0.9.9 candidate boundary.
+- [x] 4.5 Create `docs/releases/v0.9.9-evidence-closure-evidence.md` and update `docs/releases/v0.9.x-handoff.md` with the explicit v0.9.1–v0.9.9 completion/stop statement, branch, tests, archive plan, and release-branch-only version bump.
 - [ ] 4.6 Run `uv run pytest` and record the all-green documentation/e2e phase result.
 
 ## 5. Verification, sync, and archive

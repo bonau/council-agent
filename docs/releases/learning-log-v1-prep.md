@@ -782,3 +782,30 @@ alpha 才開始實作 Trust Tier 0/1/2 runtime；本紀錄中的 v0.9.x 工作�
 - 基準：tag `v0.9.8`
 - 驗證：553 passed
 - 下一步：v0.9.9 evidence-closure（清債序列最後一版；之後停止於 v1.0-alpha 前）
+
+### 2026-08-11 20:00 UTC — v0.9.9 evidence-closure implementation
+
+- 狀態：runtime、attempt correlation、evidence floor與文件校正完成；final sync/archive gate進行中
+- 基準：branch `cursor/v099-evidence-closure-d691`、package `0.9.8`不bump、change `evidence-closure`
+- 原始問題（V1-010／SEC-P1-002）：
+  - Escalation替換execution/final output後不重新Verification，舊verdict可能與新output不一致。
+  - Cumulative tracker summaries無pipeline attempt邊界，final tool／decision／audit evidence不能證明屬於同一次最終嘗試。
+  - Model可在明確要求tool／pytest時只依文字宣稱PASS。
+- 核准契約：
+  - Initial execution與每次escalation形成唯一ordered attempt；`max_retries`是實際escalation上限，每次仍用原plan／success criteria Verification。
+  - `CouncilResult` final legacy fields只選`attempts[-1]`，另公開final attempt ID與closed stop reason；舊attempt execution／verdict／tool evidence保留。
+  - 一個run共用一個`SecurityContext`與cumulative tracker；Execution/escalation只snapshot kickoff後新增summaries。Escalation使用既有dispatcher-backed adapters。
+  - `pipeline_attempt_id`只是correlation，不進matrix authority vector；result、tracker、session與audit attempt/result metadata一致保留。
+  - Explicit product-tool與test語意需要current-attempt evidence；required pytest須`success=True`、`exit_code=0`、`failed=0`。Missing／malformed／failed／cross-attempt使model PASS轉FAIL；純文字任務不捏造tool requirement。
+- 漸進驗證：
+  - Types/evidence floor：562 passed。
+  - Dispatcher/session/audit correlation：562 passed。
+  - Escalation integration首次565 passed／1 failed，找到legacy no-attempt `run_execution` summary compatibility；修正並推送後566 passed。
+  - E2E/docs與active/post-archive full gate待下方final紀錄回填。
+- 文件影響（V1-011）：
+  - README／ROADMAP／known issues／handoff與`docs/testing/`已把current candidate和歷史v0.9.0 expected failures分離。
+  - Current claims包括fail-closed simple grammar、mandatory dispatcher、principal/auth/grant-store foundation/matrix、redacted sequenced per-event audit與attempt closure。
+  - Non-goals固定為OS containment、hostile project code、external audit anchor、runtime grant consumption與Trust Tier 0/1/2。
+  - 獨立真人與無前置脈絡Agent走手冊仍是alpha admission gate；本feature不虛構外部執行證據。
+- Evidence：[`v0.9.9-evidence-closure-evidence.md`](v0.9.9-evidence-closure-evidence.md)。
+- 下一步：完成sync/archive/post-archive gate後停止本序列；不得在此branch開Trust Tier runtime或bump version。

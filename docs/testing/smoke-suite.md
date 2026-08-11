@@ -1,16 +1,16 @@
 # v1.0 準備階段 Smoke Suite 設計
 
-> 已發佈基線：v0.9.0。狀態：草稿；v0.9.1 shell-containment implementation evidence 已補入。此 suite 定義 SMK-00～SMK-08 與選配 LIVE-01；公開 beta 前所有必跑案例都必須 PASS，且所有 P0 必須關閉。
+> 已發佈基線：v0.9.8；current feature candidate：v0.9.9（package metadata 尚未 bump）。此 suite 定義 SMK-00～SMK-09 與選配 LIVE-01；公開 beta 前所有必跑案例都必須在固定 release candidate 上實際 PASS，且所有 P0 必須關閉。
 
 ## 判定原則
 
 - 結果只使用 `PASS`、`FAIL`、`BLOCKED`、`NOT-RUN`。
 - 「成功重現已知缺陷」仍是 `FAIL`，不能標為 PASS 或從分母移除。
 - 每個拒絕案例都驗證 exit code、reason、workspace diff 與 outside sentinel 無副作用。
-- 證據依 [`v1.0-beta-public-testing.md`](v1.0-beta-public-testing.md) 遮罩；audit 目前沒有可靠 secret redaction，禁止輸入真實秘密。
-- v0.9.1 已加入 simple argv 與受支援 path-operand containment，但仍不是真 OS sandbox；所有案例須在一次性、非特權、無正式資料的環境執行。
+- 證據依 [`v1.0-beta-public-testing.md`](v1.0-beta-public-testing.md) 遮罩；runtime redaction 是 defense in depth，測試仍禁止輸入真實秘密。
+- Current candidate 有 simple argv／path-operand containment、mandatory dispatcher 與多層 authority evidence，但仍不是真 OS sandbox；所有案例須在一次性、非特權、無正式資料的環境執行。
 
-## v0.9.0 預期結果
+## 歷史 v0.9.0 預期結果（只作回歸來源）
 
 | ID | 主題 | v0.9.0 預期 | 原因 |
 |---|---|---|---|
@@ -35,6 +35,18 @@
 | SMK-07 | PASS | path operands、outside sentinel、exact argv、special-path `run_tests` 與 args injection refusal；見 [`v0.9.1-shell-containment-evidence.md`](../releases/v0.9.1-shell-containment-evidence.md) |
 
 此結果關閉 V1-001／V1-002 的 implementation gate，不代表 v0.9.1 已完成 release branch 版本 bump／tag，也不解除 SMK-08、V1-003 或其餘 v0.9.x 阻斷。
+
+## Current v0.9.9 candidate 必跑矩陣
+
+| ID | Current expectation | 關閉來源 |
+|---|---|---|
+| SMK-00～SMK-05 | PASS | 基線功能、policy／confirmation regression |
+| SMK-06～SMK-07 | PASS | v0.9.1 fail-closed command／argv containment |
+| SMK-08 | PASS | v0.9.2–v0.9.8 dispatcher、control-plane、redaction、sequence、matrix evidence |
+| SMK-09 | PASS | v0.9.9 re-verification、attempt closure、required evidence floor |
+| LIVE-01 | BLOCKED 或經 release lead 明確核准後執行 | 仍需一次性 provider credential 與 network exception |
+
+`PASS` 是必須實際執行的 expectation，不是本表自行構成證據。任一 current case 失敗都要記 `FAIL`，不得回退使用 v0.9.0 expected-failure 豁免。
 
 ## 共用環境與固定順序
 
@@ -115,7 +127,7 @@ council sandbox status --workspace "$COUNCIL_TEST_ROOT/workspace"
 
 ## SMK-04 — Project Policy 載入與 Deny Precedence
 
-**目的**：驗證 v0.9.0 project policy 的現行限制與 deny 優先序。
+**目的**：驗證 current strict restrict-only project policy 與 deny 優先序。
 
 **向量**：
 
@@ -130,7 +142,8 @@ council sandbox status --workspace "$COUNCIL_TEST_ROOT/workspace"
 - 合法 allow 成功、deny 失敗且無副作用。
 - deny 不能被 confirmation 或 `--yes` 覆蓋。
 - 錯誤型別 fail-fast。
-- 另記已知限制：project policy 可被 Agent 修改，且未知欄位目前可能被忽略；不得把 policy 當成 grant。
+- Unknown／typo／authorization-shaped fields fail-fast；受控 product tools 不可直接讀寫 policy path。
+- 另記限制：host user、external process 與 `run_tests` project code 不受 product path deny containment；policy 不得當成 grant。
 
 ## SMK-05 — Confirmation 與 `--yes` 邊界
 
@@ -203,11 +216,35 @@ council sandbox status --workspace "$COUNCIL_TEST_ROOT/workspace"
 **Release gate 斷言**：
 
 - args、metadata、output、error 與巢狀欄位都遮罩。
-- sequence、gap、重複、部分寫入與 hash chain 驗證可辨識竄改。
+- sequence、gap、重複、部分寫入、canonical per-event ID 與 exact attempt/result linkage 可辨識對應竄改。
 - Agent 無法改寫控制面。
 - show／export 不洩漏原始秘密。
+- 明確記錄：沒有 predecessor-linked／externally anchored hash chain；不得把 per-event integrity substrate 寫成 tamper-proof storage。
 
 **v0.9.0 預期**：show／export 基本功能可用，但 audit 只有截斷，沒有可靠 secret redaction、sequence／gap 驗證或 hash chain。因此 **FAIL（V1-005）**。
+
+## SMK-09 — Verification／Escalation Attempt Evidence Closure
+
+**目的**：證明 escalation 產生的新 output 會重新 Verification，且 final evidence 只選同一次最終 attempt。
+
+**向量**：
+
+- Initial PASS：只有一個 attempt，不建 escalation。
+- Initial FAIL → escalation PASS：Verification 呼叫兩次，原 plan／success criteria 相同。
+- Initial FAIL → retries exhausted：最後 verdict 保持 FAIL，stop reason 為 `retries_exhausted`。
+- `max_retries=0`：不建 escalation，保留 initial FAIL。
+- Success criteria 明確要求 `run_tests`，但 current attempt 缺 summary、缺 `exit_code`／`failed`、non-zero／failed > 0 或 summary 屬舊 attempt。
+- Sandboxed initial/escalation 各做一個 tool action，檢查 result、tracker、session、audit attempt/result 的 `pipeline_attempt_id`。
+
+**斷言**：
+
+- `final_attempt_id`、final execution／output／verdict／tool summaries 同屬 `attempts[-1]`。
+- 舊 attempts、session lines 與 audit events append-only 保留。
+- 每次 escalation 後都以同一 plan 重新 Verification；不能用新文字搭配舊 verdict。
+- Required tool/test evidence 缺失、失敗、malformed 或 cross-attempt 時，即使 model 回 PASS 也必須 FAIL。
+- Tracker limit 在整個 run 累計，不因 retry 重設。
+
+自動化映射：`tests/test_orchestrator.py`、`tests/test_verification_evidence.py`、`tests/test_verification_integration.py`、`tests/test_sandbox_e2e.py`。
 
 ## LIVE-01 — 一次性 Provider 憑證完整三階段管線
 
@@ -215,7 +252,7 @@ council sandbox status --workspace "$COUNCIL_TEST_ROOT/workspace"
 
 **解鎖條件**：
 
-- SMK-00～SMK-08 在同一候選 commit 全部 PASS。
+- SMK-00～SMK-09 在同一候選 commit 全部 PASS。
 - 所有 P0 已關閉。
 - release lead 核准。
 - 使用可立即撤銷、低額、一次性的 provider key；隔離環境只開必要網域。
@@ -235,4 +272,4 @@ council sandbox status --workspace "$COUNCIL_TEST_ROOT/workspace"
 
 ## Suite 停止與完成條件
 
-任一 P0、越界副作用、policy deny bypass、秘密落盤、audit 無聲損毀或 sentinel 改變都立即停止。公開 beta 的完成條件是 SMK-00～SMK-08 100% PASS、所有 P0 關閉、無 flaky 與無非預期副作用；LIVE-01 是否必跑由 release gate 明確指定。
+任一 P0、越界副作用、policy deny bypass、秘密落盤、audit 無聲損毀或 sentinel 改變都立即停止。公開 beta 的完成條件是 SMK-00～SMK-09 100% PASS、所有 P0 關閉、無 flaky 與無非預期副作用；LIVE-01 是否必跑由 release gate 明確指定。
