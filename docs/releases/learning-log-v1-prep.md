@@ -844,3 +844,11 @@ alpha 才開始實作 Trust Tier 0/1/2 runtime；本紀錄中的 v0.9.x 工作�
 - 決策：matrix v2 允許 read+interaction；CLI 預設 Tier 0；library/run_council 預設 Tier 1；exact grant lookup 僅 dispatcher；Tier 2 選用需 step-up
 - 驗證：`uv run pytest` 577 passed
 - 下一步：sync specs → archive → release 1.0.0a1 / tag v1.0.0-alpha.1
+
+### 2026-08-11 23:12 UTC — v1.0-alpha tagged；beta freeze 開始
+
+- 狀態：通過（alpha）；beta freeze 文件落地中
+- 基準：tag `v1.0.0-alpha.1`、package `1.0.0a1`、develop sync `dd4d99f`
+- 驗證：release check 577 passed；beta smoke（tier/grant/shell）PASS
+- 決策：凍結 Tier／matrix-v2／principal／grant／auth／audit contracts；beta 不加新安全語意
+- 下一步：release/1.0.0b1 → tag `v1.0.0-beta.1`
