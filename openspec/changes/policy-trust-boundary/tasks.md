@@ -3,7 +3,7 @@
 - [x] 1.1 Add required integer schema version 1, strict known-field validation, sanitized diagnostics, and explicit unversioned/unsupported migration refusal in the pure policy loader.
 - [x] 1.2 Add policy unit tests for valid version 1, missing/unsupported/wrong-typed versions, unknown fields, misspellings, invalid known fields, secret-value omission, and whole-file refusal.
 - [x] 1.3 Add restrict-only unit tests proving allow patterns cannot bypass built-in command rejection, confirmation, command deny precedence, or default path denials.
-- [ ] 1.4 Run `uv run pytest` with the full existing suite before middleware/orchestrator wiring.
+- [x] 1.4 Run `uv run pytest` with the full existing suite before middleware/orchestrator wiring.
 
 ## 2. SecurityContext and orchestrator wiring
 
