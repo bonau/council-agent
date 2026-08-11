@@ -20,7 +20,13 @@ from council_agent.sandbox.config import (
     resolve_workspace_root,
 )
 from council_agent.sandbox.session import SessionManager
-from council_agent.security import resolve_cli_confirm_mode
+from council_agent.security import (
+    default_audit_events_path,
+    export_audit_events,
+    filter_audit_events,
+    load_audit_events,
+    resolve_cli_confirm_mode,
+)
 
 app = typer.Typer(
     name="council",
@@ -29,8 +35,10 @@ app = typer.Typer(
 )
 presets_app = typer.Typer(help="Manage model presets.")
 sandbox_app = typer.Typer(help="Manage local sandbox workspace and sessions.")
+audit_app = typer.Typer(help="Show and export structured tool audit logs.")
 app.add_typer(presets_app, name="presets")
 app.add_typer(sandbox_app, name="sandbox")
+app.add_typer(audit_app, name="audit")
 console = Console()
 
 def _configure_workspace(workspace: Path | None) -> Path:
@@ -151,6 +159,132 @@ def sandbox_status(
             f"[bold]Latest session:[/bold]\n{session_text}",
             title="Sandbox Status",
             border_style="blue",
+        )
+    )
+
+
+def _resolve_audit_project(workspace: Path | None) -> Path:
+    return Path(workspace).resolve() if workspace is not None else Path.cwd()
+
+
+@audit_app.command("show")
+def audit_show(
+    limit: int = typer.Option(
+        50,
+        "--limit",
+        "-n",
+        help="Maximum number of recent events to display.",
+        min=1,
+    ),
+    session: str | None = typer.Option(
+        None,
+        "--session",
+        "-s",
+        help="Filter events by session id.",
+    ),
+    workspace: Path | None = typer.Option(
+        None,
+        "--workspace",
+        "-w",
+        help="Project root containing `.council/` (default: cwd).",
+        exists=True,
+        file_okay=False,
+        dir_okay=True,
+        resolve_path=True,
+    ),
+) -> None:
+    """Display recent structured audit events."""
+    project = _resolve_audit_project(workspace)
+    events_path = default_audit_events_path(project)
+    events = filter_audit_events(
+        load_audit_events(events_path),
+        session_id=session,
+    )
+
+    if not events:
+        console.print(
+            Panel(
+                "No audit events."
+                + (
+                    f"\nFilter session={session}"
+                    if session
+                    else f"\nLog: {events_path}"
+                ),
+                title="Audit Show",
+                border_style="yellow",
+            )
+        )
+        raise typer.Exit(code=0)
+
+    # Show the most recent `limit` events while preserving chronological order.
+    shown = events[-limit:]
+    table = Table(title=f"Audit events ({len(shown)} of {len(events)})")
+    table.add_column("Timestamp", style="dim")
+    table.add_column("Tool", style="cyan")
+    table.add_column("Success")
+    table.add_column("Session")
+    table.add_column("Error", overflow="fold")
+
+    for event in shown:
+        table.add_row(
+            event.timestamp,
+            event.tool,
+            "yes" if event.success else "no",
+            event.session_id or "-",
+            event.error or "",
+        )
+
+    console.print(table)
+
+
+@audit_app.command("export")
+def audit_export(
+    output: Path = typer.Argument(
+        ...,
+        help="Destination file path for the export (JSONL by default).",
+    ),
+    session: str | None = typer.Option(
+        None,
+        "--session",
+        "-s",
+        help="Filter events by session id.",
+    ),
+    workspace: Path | None = typer.Option(
+        None,
+        "--workspace",
+        "-w",
+        help="Project root containing `.council/` (default: cwd).",
+        exists=True,
+        file_okay=False,
+        dir_okay=True,
+        resolve_path=True,
+    ),
+    fmt: str = typer.Option(
+        "jsonl",
+        "--format",
+        "-f",
+        help="Export format: jsonl or json.",
+    ),
+) -> None:
+    """Export audit events to a file."""
+    if fmt not in {"jsonl", "json"}:
+        console.print("[red]Invalid --format; use jsonl or json.[/red]")
+        raise typer.Exit(code=1)
+
+    project = _resolve_audit_project(workspace)
+    events_path = default_audit_events_path(project)
+    events = filter_audit_events(
+        load_audit_events(events_path),
+        session_id=session,
+    )
+    dest = export_audit_events(events, output, format=fmt)
+    console.print(
+        Panel(
+            f"[bold]Exported:[/bold] {len(events)} event(s)\n"
+            f"[bold]Format:[/bold] {fmt}\n"
+            f"[bold]Output:[/bold] {dest.resolve()}",
+            title="Audit Export",
+            border_style="green",
         )
     )
 

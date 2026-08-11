@@ -6,18 +6,19 @@ OpenRouter + CrewAI 三階段 CLI 框架：每次推論依序經過 **計劃 →
 
 - 三階段 Crew 管線（Planning / Execution / Verification）
 - 內建兩組模型 Preset，全部透過 OpenRouter 路由
-- Typer CLI 介面，支援 `--verbose`、`--workspace`、`--yes` 與 `council sandbox` 子命令
+- Typer CLI 介面，支援 `--verbose`、`--workspace`、`--yes`、`council sandbox` 與 `council audit` 子命令
 - 校驗失敗時自動 escalation（可設定 `max_retries`）
 - Tool 基礎層：`read_file`、`write_file`、`list_dir`、`delete_file`、`run_command`、`run_tests`
 - Execution Crew 掛載上述 tools，可在工作區內實際改檔與跑測試
 - `WorkspaceGuard` 限制檔案與 shell 操作在工作區內
 - 指令分類：`read` / `write` / `dangerous` pattern 啟發式
 - 互動確認：危險／寫入 shell 與 `write_file`／`delete_file` 在 CLI 執行時需確認；`--yes` 跳過；無 TTY 預設拒絕
+- 結構化審計日誌：sandbox 已初始化時，tool 呼叫寫入 `.council/audit/events.jsonl`；可用 `council audit show`／`export` 檢視與匯出
 - Tool 呼叫追蹤與 `max_tool_calls` 上限（預設 50）
 - Verification 可接收結構化 tool 執行摘要（含 pytest 結果）
-- 可選 `.council/` sandbox：session 紀錄（`meta.json` + `tools.jsonl`）
+- 可選 `.council/` sandbox：session 紀錄（`meta.json` + `tools.jsonl`）與跨 session 審計（`audit/events.jsonl`）
 
-> **安全提示**：`run_command` 使用 `shell=True`。指令分類為 pattern 啟發式；CLI 會對危險／寫入操作要求確認（或在無 TTY 時拒絕），CI 請加 `--yes`。仍**不是**完整信任框架（尚無政策檔、Trust Tier、審計）。請僅在信任的專案目錄使用，並避免將不受信任的 prompt 直接餵給 Agent。後續規劃見 [ROADMAP.md](ROADMAP.md) v0.8+。
+> **安全提示**：`run_command` 使用 `shell=True`。指令分類為 pattern 啟發式；CLI 會對危險／寫入操作要求確認（或在無 TTY 時拒絕），CI 請加 `--yes`。審計日誌可追溯 tool 呼叫，但仍**不是**完整信任框架（尚無政策檔、Trust Tier、hash chain）。請僅在信任的專案目錄使用，並避免將不受信任的 prompt 直接餵給 Agent。後續規劃見 [ROADMAP.md](ROADMAP.md) v0.9+。
 
 ## Presets
 
@@ -79,9 +80,15 @@ uv run council run "整理 README" --workspace /path/to/project
 
 # 查看工作區與最近 session 摘要
 uv run council sandbox status
+
+# 檢視／匯出跨 session 審計日誌（需先 sandbox init）
+uv run council audit show
+uv run council audit show --session <session-id> --limit 20
+uv run council audit export ./audit-export.jsonl
+uv run council audit export ./audit-s1.jsonl --session <session-id>
 ```
 
-Workspace 解析順序：`--workspace` > `.council/config.yaml` > `COUNCIL_WORKSPACE_ROOT` > 目前工作目錄。未初始化 sandbox 時管線仍可執行（向後相容），只是不會寫入 session 檔。
+Workspace 解析順序：`--workspace` > `.council/config.yaml` > `COUNCIL_WORKSPACE_ROOT` > 目前工作目錄。未初始化 sandbox 時管線仍可執行（向後相容），只是不會寫入 session 檔與審計日誌。
 
 ## 環境變數
 

@@ -3,6 +3,7 @@
 from council_agent.sandbox.config import (
     CouncilConfig,
     apply_workspace_root,
+    audit_dir,
     clear_workspace_caches,
     init_sandbox,
     is_sandbox_initialized,
@@ -25,6 +26,7 @@ __all__ = [
     "WorkspaceGuard",
     "WorkspaceGuardError",
     "apply_workspace_root",
+    "audit_dir",
     "clear_workspace_caches",
     "get_workspace_guard",
     "init_sandbox",
