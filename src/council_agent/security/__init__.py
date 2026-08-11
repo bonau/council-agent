@@ -1,21 +1,28 @@
 """Security helpers: classification, confirmation, audit, and policy (v0.6+)."""
 
 from council_agent.security.audit import (
+    AUDIT_EVENT_ID_PREFIX,
+    AUDIT_SCHEMA_VERSION,
     DEFAULT_ARG_MAX_CHARS,
     DEFAULT_EVENTS_FILENAME,
-    TRUNCATION_MARKER,
     AuditLogger,
+    AuditIntegrityError,
+    AuditIntegrityReport,
     AuditRecord,
     audit_logger_context,
+    canonical_audit_json,
+    compute_audit_event_id,
     default_audit_events_path,
     export_audit_events,
     filter_audit_events,
     get_audit_logger,
     load_audit_events,
+    load_audit_events_with_integrity,
     record_audit_event,
     reset_audit_logger,
     set_audit_logger,
     truncate_value,
+    verify_audit_events,
 )
 from council_agent.security.classifier import (
     ClassificationResult,
@@ -60,6 +67,12 @@ from council_agent.security.policy import (
     reset_active_policy,
     set_active_policy,
 )
+from council_agent.security.redaction import (
+    REDACTION_MARKER,
+    TRUNCATION_MARKER,
+    redact_text,
+    sanitize_value,
+)
 from council_agent.security.middleware import (
     POLICY_VERSION_BUILTIN,
     POLICY_VERSION_PROJECT_V1,
@@ -77,7 +90,11 @@ from council_agent.security.middleware import (
 
 __all__ = [
     "ActionKind",
+    "AUDIT_EVENT_ID_PREFIX",
+    "AUDIT_SCHEMA_VERSION",
     "AuditLogger",
+    "AuditIntegrityError",
+    "AuditIntegrityReport",
     "AuditRecord",
     "ClassificationResult",
     "CommandAnalysis",
@@ -100,6 +117,7 @@ __all__ = [
     "PolicyCommandReason",
     "PolicyError",
     "PolicyValidationError",
+    "REDACTION_MARKER",
     "RejectedCommandAnalysis",
     "SUPPORTED_TOOL_NAMES",
     "SecurityContext",
@@ -108,9 +126,11 @@ __all__ = [
     "TRUNCATION_MARKER",
     "active_policy",
     "audit_logger_context",
+    "canonical_audit_json",
     "classify_command",
     "contains_shell_control",
     "confirmation_policy",
+    "compute_audit_event_id",
     "default_audit_events_path",
     "default_confirm_fn",
     "evaluate_confirmation",
@@ -125,9 +145,11 @@ __all__ = [
     "get_security_context",
     "invoke",
     "load_audit_events",
+    "load_audit_events_with_integrity",
     "load_policy_file",
     "policy_path",
     "record_audit_event",
+    "redact_text",
     "require_confirmation",
     "require_security_context",
     "reset_active_policy",
@@ -138,6 +160,8 @@ __all__ = [
     "set_audit_logger",
     "set_confirmation_policy",
     "security_context",
+    "sanitize_value",
     "truncate_value",
+    "verify_audit_events",
     "without_security_context",
 ]
