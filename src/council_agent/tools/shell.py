@@ -9,7 +9,13 @@ import time
 from typing import Any
 
 from council_agent.sandbox.workspace import WorkspaceGuardError, get_workspace_guard
-from council_agent.security import ActionKind, CommandCategory, classify_command, require_confirmation
+from council_agent.security import (
+    ActionKind,
+    CommandCategory,
+    classify_command,
+    evaluate_command_policy,
+    require_confirmation,
+)
 from council_agent.tools.base import ToolResult, _err, _ok
 
 _SUMMARY_LINE = re.compile(
@@ -64,6 +70,21 @@ def run_command(
 
     if not command or not command.strip():
         return _err("Empty command")
+
+    policy_decision = evaluate_command_policy(command)
+    if not policy_decision.allowed:
+        reason = (
+            policy_decision.reason.value
+            if policy_decision.reason is not None
+            else "denied"
+        )
+        meta: dict[str, Any] = {"policy_decision": reason}
+        if policy_decision.matched_pattern is not None:
+            meta["policy_pattern"] = policy_decision.matched_pattern
+            detail = f"matched: {policy_decision.matched_pattern}"
+        else:
+            detail = "not in allowed_commands"
+        return _err(f"Command denied by policy ({reason}; {detail})", **meta)
 
     classification = classify_command(command)
     class_meta: dict[str, Any] = {"classification": classification.category.value}

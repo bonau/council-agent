@@ -62,6 +62,19 @@ class WorkspaceGuard:
             f"Path is outside workspace root ({self.root}): {resolved}"
         )
 
+    def _effective_denied_patterns(self) -> tuple[str, ...]:
+        """Union of constructed denylist and active policy ``denied_paths``."""
+        # Lazy import avoids circular import with security.policy.
+        from council_agent.security.policy import get_active_policy
+
+        patterns = list(self.denied_patterns)
+        policy = get_active_policy()
+        if policy is not None:
+            for pattern in policy.denied_paths:
+                if pattern not in patterns:
+                    patterns.append(pattern)
+        return tuple(patterns)
+
     def _ensure_not_denied(self, resolved: Path) -> None:
         try:
             relative = resolved.relative_to(self.root)
@@ -72,7 +85,7 @@ class WorkspaceGuard:
         if posix == ".":
             posix = ""
 
-        for pattern in self.denied_patterns:
+        for pattern in self._effective_denied_patterns():
             if self._matches_pattern(posix, pattern):
                 display = posix or "."
                 raise WorkspaceGuardError(f"Access denied for sensitive path: {display}")

@@ -101,12 +101,15 @@ src/council_agent/
 ├── tools/              # 純 Python tool 函式；回傳 ToolResult
 │   ├── base.py         # ToolResult
 │   ├── filesystem.py   # read/write/list/delete（經 WorkspaceGuard）
-│   ├── shell.py        # run_command、run_tests（經指令分類）
+│   ├── shell.py        # run_command、run_tests（經指令分類與政策）
 │   └── tracker.py      # ToolCallTracker、max_tool_calls
 ├── sandbox/
-│   └── workspace.py    # WorkspaceGuard 邊界驗證
+│   └── workspace.py    # WorkspaceGuard 邊界驗證（含政策 denied_paths 聯集）
 └── security/           # v0.6+ 安全補強
-    └── classifier.py   # 指令分類（read / write / dangerous）
+    ├── classifier.py   # 指令分類（read / write / dangerous）
+    ├── confirm.py      # 互動確認閘道
+    ├── audit.py        # 結構化審計日誌
+    └── policy.py       # council.policy.yaml 載入與評估（v0.9）
 ```
 
 | 禁令 | 說明 |
@@ -116,8 +119,9 @@ src/council_agent/
 | Tool 可預期錯誤**禁止** throw | 須回傳 `ToolResult(success=False)` |
 | filesystem / shell tool **必須**經 `WorkspaceGuard` | 在函式入口驗證路徑 |
 | `run_command` **必須**經指令分類器 | `dangerous`／`write` 經確認閘道（CLI：ask／auto／refuse；函式庫預設 compat） |
-| 確認閘道 | `security/confirm.py`；`cli.py` **禁止**直接呼叫 `tools/*`；政策經 orchestrator ContextVar |
-| **禁止**宣稱已具完整安全機制 | 分類為 pattern 啟發式；審計／政策檔／Trust Tier 見 ROADMAP v0.8+ |
+| 確認閘道 | `security/confirm.py`；`cli.py` **禁止**直接呼叫 `tools/*`；確認政策經 orchestrator ContextVar |
+| 專案政策 | `security/policy.py`；`run_command` 套用 allow/deny；路徑 denylist 與預設聯集 |
+| **禁止**宣稱已具完整安全機制 | 分類為 pattern 啟發式；Trust Tier／完整 middleware 見 ROADMAP v1.0 |
 
 ## 漸進式整合（硬性）
 

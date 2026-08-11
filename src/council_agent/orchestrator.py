@@ -21,8 +21,11 @@ from council_agent.security import (
     ConfirmMode,
     ConfirmationPolicy,
     default_audit_events_path,
+    load_policy_file,
+    reset_active_policy,
     reset_audit_logger,
     reset_confirmation_policy,
+    set_active_policy,
     set_audit_logger,
     set_confirmation_policy,
 )
@@ -90,6 +93,19 @@ def _resolve_session_project(
     return None
 
 
+def _resolve_policy_root(
+    workspace_root: Path,
+    project_root: Path | None,
+    session_project: Path | None,
+) -> Path:
+    """Prefer sandbox project root, then explicit project_root, then workspace."""
+    if session_project is not None:
+        return session_project
+    if project_root is not None:
+        return Path(project_root).expanduser().resolve()
+    return Path(workspace_root).expanduser().resolve()
+
+
 def build_escalation_crew(preset: Preset, api_key: str) -> Crew:
     role = preset.escalation
     agent = Agent(
@@ -144,6 +160,14 @@ def run_council(
         Path(project_root) if project_root is not None else None,
     )
 
+    policy_root = _resolve_policy_root(
+        workspace_root,
+        Path(project_root) if project_root is not None else None,
+        session_project,
+    )
+    # Fail fast on invalid policy before session/crews start.
+    loaded_policy = load_policy_file(policy_root)
+
     session: SessionManager | None = None
     if session_project is not None:
         session = SessionManager.create(
@@ -169,7 +193,10 @@ def run_council(
         execution_crew.verbose = True
         verification_crew.verbose = True
 
-    policy_token = set_confirmation_policy(
+    project_policy_token = (
+        set_active_policy(loaded_policy) if loaded_policy is not None else None
+    )
+    confirm_policy_token = set_confirmation_policy(
         ConfirmationPolicy(mode=confirm_mode, confirm_fn=confirm_fn)
     )
     audit_token = None
@@ -213,7 +240,9 @@ def run_council(
         session_status = "failed"
         raise
     finally:
-        reset_confirmation_policy(policy_token)
+        reset_confirmation_policy(confirm_policy_token)
+        if project_policy_token is not None:
+            reset_active_policy(project_policy_token)
         if audit_token is not None:
             reset_audit_logger(audit_token)
         if session is not None:

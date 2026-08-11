@@ -7,6 +7,7 @@ from pathlib import Path
 import pytest
 
 from council_agent.sandbox.workspace import WorkspaceGuard, WorkspaceGuardError
+from council_agent.security import CouncilPolicy, active_policy
 
 
 @pytest.fixture
@@ -136,3 +137,33 @@ def test_guard_rejects_file_root(tmp_path: Path) -> None:
     file_root.write_text("x", encoding="utf-8")
     with pytest.raises(WorkspaceGuardError, match="not a directory"):
         WorkspaceGuard(file_root)
+
+
+def test_policy_denied_path_blocked(guard: WorkspaceGuard, tmp_path: Path) -> None:
+    secrets = tmp_path / "secrets"
+    secrets.mkdir()
+    (secrets / "token.txt").write_text("x", encoding="utf-8")
+    policy = CouncilPolicy(denied_paths=["secrets/**"])
+    with active_policy(policy):
+        with pytest.raises(WorkspaceGuardError, match="denied"):
+            guard.resolve("secrets/token.txt")
+
+
+def test_default_denylist_still_applies_with_policy(
+    guard: WorkspaceGuard, tmp_path: Path
+) -> None:
+    (tmp_path / ".env").write_text("SECRET=1", encoding="utf-8")
+    policy = CouncilPolicy(denied_paths=["secrets/**"])
+    with active_policy(policy):
+        with pytest.raises(WorkspaceGuardError, match="denied"):
+            guard.resolve(".env")
+
+
+def test_no_policy_adds_no_extra_path_denials(
+    guard: WorkspaceGuard, tmp_path: Path
+) -> None:
+    secrets = tmp_path / "secrets"
+    secrets.mkdir()
+    target = secrets / "token.txt"
+    target.write_text("x", encoding="utf-8")
+    assert guard.resolve("secrets/token.txt") == target.resolve()

@@ -9,8 +9,8 @@ context: |
   Testing: uv run pytest
   Docs: README.md, ROADMAP.md, CONTRIBUTING.md, AGENTS.md
   Development policy: Spec-driven Development with OpenSpec (see AGENTS.md)
-  Current version: v0.8.0 — structured audit logging (`.council/audit/` + `council audit show`/`export`); confirmation and command classification retained
-  Capabilities: tools (filesystem, shell, run_tests, CrewAI wrappers), sandbox (WorkspaceGuard, session, CLI, audit dir), orchestration (tracker, max_tool_calls, auto summaries, confirmation policy, audit logger install), security (command classifier, interactive confirmation modes ask/auto/refuse/compat, structured audit JSONL + council audit show/export)
+  Current version: v0.8.0 — v0.9 policy file (`council.policy.yaml`) complete pending 0.9.0 release
+  Capabilities: tools (filesystem, shell, run_tests, CrewAI wrappers, policy gates on run_command), sandbox (WorkspaceGuard with policy denied_paths union, session, CLI, audit dir), orchestration (tracker, max_tool_calls, auto summaries, confirmation policy, audit logger install, project policy install), security (command classifier, interactive confirmation modes ask/auto/refuse/compat, structured audit JSONL + council audit show/export, council.policy.yaml allow/deny commands and denied_paths)
 
 rules:
   proposal:
