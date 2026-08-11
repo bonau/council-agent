@@ -1,0 +1,73 @@
+==> uv sync --extra dev
+Resolved 143 packages in 1ms
+Checked 140 packages in 1ms
+==> pytest
+============================= test session starts ==============================
+platform linux -- Python 3.12.3, pytest-9.1.1, pluggy-1.6.0
+rootdir: /workspace
+configfile: pyproject.toml
+testpaths: tests
+plugins: anyio-4.14.2, mock-3.15.1
+collected 568 items
+
+tests/test_audit.py .......................                              [  4%]
+tests/test_authentication.py ...............                             [  6%]
+tests/test_cli_audit.py .........                                        [  8%]
+tests/test_cli_sandbox.py .........                                      [  9%]
+tests/test_cli_trust.py .......                                          [ 11%]
+tests/test_command_classifier.py ....................................... [ 17%]
+............................                                             [ 22%]
+tests/test_confirmation.py .........                                     [ 24%]
+tests/test_crew_tools.py ...........                                     [ 26%]
+tests/test_filesystem_confirmation.py .....                              [ 27%]
+tests/test_orchestrator.py ...............                               [ 29%]
+tests/test_policy.py .......................                             [ 33%]
+tests/test_policy_middleware.py .................                        [ 36%]
+tests/test_policy_middleware_tools.py ...........                        [ 38%]
+tests/test_presets.py ....                                               [ 39%]
+tests/test_principal.py ........................                         [ 43%]
+tests/test_principal_middleware.py ...................                   [ 47%]
+tests/test_pytest_args.py ......................                         [ 51%]
+tests/test_run_command_classification.py ..........                      [ 52%]
+tests/test_run_command_policy.py .......                                 [ 54%]
+tests/test_sandbox_e2e.py ......                                         [ 55%]
+tests/test_sandbox_session.py ..........                                 [ 56%]
+tests/test_session_auth_e2e.py ...                                       [ 57%]
+tests/test_session_auth_middleware.py ............                       [ 59%]
+tests/test_session_auth_orchestration.py .......                         [ 60%]
+tests/test_shell_containment.py ........................................ [ 67%]
+............                                                             [ 69%]
+tests/test_tool_tracker.py ...                                           [ 70%]
+tests/test_tools_filesystem.py ...........                               [ 72%]
+tests/test_tools_run_tests.py ......                                     [ 73%]
+tests/test_tools_shell.py .....                                          [ 74%]
+tests/test_tools_workspace_integration.py .....                          [ 75%]
+tests/test_trust_decision_entrypoints.py ....                            [ 75%]
+tests/test_trust_decision_matrix.py .................................... [ 82%]
+........                                                                 [ 83%]
+tests/test_trust_decision_middleware.py .......                          [ 84%]
+tests/test_trust_grant_management.py .......                             [ 86%]
+tests/test_trust_grant_store.py .........................                [ 90%]
+tests/test_verification_evidence.py ..........                           [ 92%]
+tests/test_verification_integration.py .....                             [ 93%]
+tests/test_workspace_guard.py .......................................    [100%]
+
+============================= 568 passed in 6.60s ==============================
+==> openspec validate --changes --strict
+npm warn exec The following package was not found and will be installed: @fission-ai/openspec@1.8.0
+- Validating...
+No items found to validate.
+npm notice
+npm notice New major version of npm available! 10.9.2 -> 12.0.2
+npm notice Changelog: https://github.com/npm/cli/releases/tag/v12.0.2
+npm notice To update run: npm install -g npm@12.0.2
+npm notice
+==> openspec validate --specs --strict
+- Validating...
+✓ spec/orchestration
+✓ spec/release-prep
+✓ spec/sandbox
+✓ spec/security
+✓ spec/tools
+Totals: 5 passed, 0 failed (5 items)
+All checks passed.
