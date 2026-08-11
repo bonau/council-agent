@@ -12,7 +12,7 @@
 | OpenRouter + YAML Preset | ✅ |
 | Typer CLI | ✅ |
 | Tool 基礎層（read/write/list/delete/run_command） | ✅ |
-| WorkspaceGuard 邊界防護 | ✅ |
+| WorkspaceGuard 邊界防護（filesystem 路徑；shell 僅驗證 cwd） | ⚠️ |
 | `run_tests` + 結構化 pytest 報告 | ✅ |
 | Tool 呼叫追蹤與 `max_tool_calls` 上限 | ✅ |
 | Verification 讀取 tool 執行摘要 | ✅ |
@@ -26,6 +26,9 @@
 | Trust Tier | ❌（v1.0） |
 
 v0.9 已發佈：可選專案根目錄 `council.policy.yaml` 自訂允許／拒絕指令 pattern 與額外敏感路徑；`run_command` 與 `WorkspaceGuard` 會套用政策。指令分類、互動確認與審計能力保留；Trust Tier 與完整 Policy Middleware 見 v1.0。
+
+> **v1.0 準備（2026-08-11）**：進入 Trust Tier 前須先以 **v0.9.1–v0.9.9** 清債。詳見 [docs/releases/major-release-prep-playbook.md](docs/releases/major-release-prep-playbook.md)、[docs/releases/v1.0-alpha-known-issues.md](docs/releases/v1.0-alpha-known-issues.md)。  
+> 已知限制：shell 非 OS sandbox；classifier 未知指令 fail-open 為 `read`；ConfirmMode ≠ Trust Tier；audit 無 hash chain／secret redaction；project policy 位於 Agent 可寫路徑。
 
 ## 目標里程碑
 
@@ -221,9 +224,35 @@ uv run council sandbox status
 
 ---
 
+### v0.9.1–v0.9.9 — v1.0 前清債（一版一主要問題）
+
+**目標**：在實作 Trust Tier 前，關閉與 v1.0 DoD 衝突的 P0／P1。每個 patch **只解一個主要問題**；Trust Tier runtime 留給 v1.0-alpha。
+
+| 版本 | 主要問題 | 驗收焦點 |
+|------|----------|----------|
+| v0.9.1 | Shell containment（含 classifier fail-open、`run_tests` quoting） | 未知／混淆指令 fail-closed；shell 不可藉「read」越界 |
+| v0.9.2 | 唯一 Policy Middleware／dispatcher + `SecurityContext` | 所有產品 tool 路徑無旁路；統一決策與 audit 關聯 |
+| v0.9.3 | 政策 trust boundary + versioned schema fail-fast | project policy 只能縮權；未知安全欄位 fail-fast |
+| v0.9.4 | Audit integrity substrate | 控制面保護、redaction、sequence；Agent 不可竄改 |
+| v0.9.5 | Principal／API Key scope 模型 | 區分 provider key 與授權 principal／scopes |
+| v0.9.6 | Session authentication foundation | 高權限 step-up；`--yes` ≠ 認證 |
+| v0.9.7 | User-owned trust grant store | grants 在 workspace 外；可 revoke |
+| v0.9.8 | Trust Tier decision matrix（與 ConfirmMode 分離） | 決策表可測；不啟用 Tier runtime |
+| v0.9.9 | Verification／escalation evidence closure + 文件校正 | escalation 後重新驗證；宣稱與邊界一致 |
+
+**v1.0-alpha 准入**：v0.9.1–v0.9.9 全數發佈；已知問題清單中 P0／P1 已關閉並有證據；`./scripts/check.sh` 通過；真人與 Agent 測試手冊已走通。
+
+**v1.0-beta 准入**：alpha 功能完成並 archive；P0 全關；公開測試文件就緒；公告固定 beta tag／commit。
+
+準備文件：[`docs/releases/major-release-prep-playbook.md`](docs/releases/major-release-prep-playbook.md)、[`docs/releases/learning-log-v1-prep.md`](docs/releases/learning-log-v1-prep.md)、[`docs/testing/`](docs/testing/)。
+
+**Non-goals（本清債序列）**：不實作 Trust Tier 0/1/2 對外行為、不以 `--yes` 充當 Tier 2、不宣稱完整 OS sandbox（除非該版明確交付）。
+
+---
+
 ### v1.0 — 信任框架
 
-**目標**：完整信任機制、指令授權防護與認證。
+**目標**：完整信任機制、指令授權防護與認證。**僅在 v0.9.x 清債完成後**於 v1.0-alpha 實作。
 
 | 項目 | 說明 |
 |------|------|
@@ -361,16 +390,18 @@ class ToolResult:
 ## 開發順序建議
 
 ```
-v0.1.0 (現況)
-  └─ feature/tools ──────────────► v0.2
-       └─ feature/workspace-guard ► v0.3
-            └─ feature/test-integration ► v0.4
-                 └─ feature/sandbox-mvp ► v0.5
-                      ├─ feature/security-classifier ► v0.6
-                      ├─ feature/security-confirm ──► v0.7
-                      ├─ feature/audit ─────────────► v0.8
-                      ├─ feature/policy ────────────► v0.9
-                      └─ feature/trust-framework ───► v1.0
+v0.1.0
+  └─ … ► v0.9
+           ├─ shell-containment ─────────► v0.9.1
+           ├─ policy-middleware ─────────► v0.9.2
+           ├─ policy-trust-boundary ─────► v0.9.3
+           ├─ audit-integrity ───────────► v0.9.4
+           ├─ principal-scope ───────────► v0.9.5
+           ├─ session-auth ──────────────► v0.9.6
+           ├─ trust-grant-store ─────────► v0.9.7
+           ├─ trust-decision-matrix ─────► v0.9.8
+           ├─ evidence-closure ──────────► v0.9.9
+           └─ feature/trust-framework ───► v1.0-alpha → beta → GA
 ```
 
 每個 feature 分支從 `develop` 分出，完成後以 `--no-ff` 合併回 `develop`。版本發布時從 `develop` 開 `release/<version>` 分支，合併至 `main` 並打 tag。
@@ -383,4 +414,4 @@ v0.1.0 (現況)
 
 ---
 
-*最後更新：2026-08-11 · 策略：Tool-First 漸進式 · 開發方式：Spec-driven + OpenSpec*
+*最後更新：2026-08-11 · 策略：Tool-First 漸進式 · v0.9.x 清債後進入 v1.0-alpha · 開發方式：Spec-driven + OpenSpec*
