@@ -6,7 +6,10 @@ from dataclasses import FrozenInstanceError
 
 import pytest
 
-from council_agent.llm.openrouter import OpenRouterCredential
+from council_agent.llm.openrouter import (
+    OpenRouterCredential,
+    make_llm,
+)
 from council_agent.security import (
     ALL_PRINCIPAL_SCOPES,
     AuthorizationReason,
@@ -15,6 +18,7 @@ from council_agent.security import (
     PrincipalScope,
     evaluate_principal_scopes,
     full_scope_principal,
+    local_cli_principal,
     parse_principal_scopes,
     required_scopes_for_action,
 )
@@ -126,6 +130,50 @@ def test_provider_credential_masks_secret_and_is_not_a_principal() -> None:
             issuer="provider",
             scopes=frozenset(),
         )
+
+
+def test_openrouter_factory_reveals_key_only_to_model_client(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls: list[dict] = []
+
+    class FakeLLM:
+        def __init__(self, **kwargs: object) -> None:
+            calls.append(kwargs)
+
+    monkeypatch.setattr("council_agent.llm.openrouter.LLM", FakeLLM)
+    credential = OpenRouterCredential("provider-secret")
+
+    make_llm("model", 0.25, credential)
+
+    assert calls == [
+        {
+            "model": "openrouter/model",
+            "base_url": "https://openrouter.ai/api/v1",
+            "api_key": "provider-secret",
+            "temperature": 0.25,
+        }
+    ]
+    with pytest.raises(TypeError, match="OpenRouterCredential"):
+        make_llm(
+            "model",
+            0.25,
+            _principal(PrincipalScope.READ),  # type: ignore[arg-type]
+        )
+
+
+def test_local_cli_principal_defaults_full_and_parses_narrow_scope(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr("getpass.getuser", lambda: "stable-user")
+
+    default = local_cli_principal()
+    narrowed = local_cli_principal("configured-id", "read")
+
+    assert default.principal_id == "local-user:stable-user"
+    assert default.scopes == ALL_PRINCIPAL_SCOPES
+    assert narrowed.principal_id == "configured-id"
+    assert narrowed.scopes == frozenset({PrincipalScope.READ})
 
 
 @pytest.mark.parametrize(

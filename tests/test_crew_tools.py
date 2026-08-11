@@ -8,6 +8,7 @@ from unittest.mock import MagicMock, patch
 from council_agent.config.presets import get_preset_by_name
 from council_agent.crews.execution import build_execution_crew, run_execution
 from council_agent.crews.execution_tools import build_execution_tools
+from council_agent.llm.openrouter import OpenRouterCredential
 from council_agent.sandbox.config import init_sandbox
 from council_agent.sandbox.session import SessionManager
 from council_agent.security import (
@@ -24,6 +25,7 @@ from council_agent.tools import ToolCallTracker, ToolResult, run_command
 from council_agent.types import PlanArtifact
 
 PRESETS_DIR = Path(__file__).resolve().parents[1] / "presets"
+PROVIDER_CREDENTIAL = OpenRouterCredential("fake-key")
 
 
 def _tools_by_name():
@@ -197,8 +199,9 @@ def test_build_execution_crew_mounts_tools(
     crew_instance = MagicMock()
     mock_crew.return_value = crew_instance
     preset = get_preset_by_name(PRESETS_DIR, "glm-stack")
-    result = build_execution_crew(preset, "fake-key")
+    result = build_execution_crew(preset, PROVIDER_CREDENTIAL)
     assert result is crew_instance
+    assert mock_llm.call_args.args[2] is PROVIDER_CREDENTIAL
 
     kwargs = mock_agent.call_args.kwargs
     tool_names = {t.name for t in kwargs["tools"]}
@@ -224,7 +227,11 @@ def test_build_execution_crew_can_disable_tools(
 ) -> None:
     mock_llm.return_value = MagicMock()
     preset = get_preset_by_name(PRESETS_DIR, "glm-stack")
-    build_execution_crew(preset, "fake-key", enable_tools=False)
+    build_execution_crew(
+        preset,
+        PROVIDER_CREDENTIAL,
+        enable_tools=False,
+    )
     assert mock_agent.call_args.kwargs["tools"] == []
 
 

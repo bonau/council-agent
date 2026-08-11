@@ -83,6 +83,7 @@ from council_agent.security.principal import (
     ScopeDecision,
     evaluate_principal_scopes,
     full_scope_principal,
+    local_cli_principal,
     parse_principal_scopes,
     required_scopes_for_action,
 )
@@ -169,6 +170,7 @@ __all__ = [
     "load_audit_events",
     "load_audit_events_with_integrity",
     "load_policy_file",
+    "local_cli_principal",
     "parse_principal_scopes",
     "policy_path",
     "record_audit_event",

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+import getpass
 from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass
 from enum import Enum
@@ -49,7 +50,7 @@ def parse_principal_scopes(value: str | Iterable[str]) -> frozenset[PrincipalSco
         try:
             scopes.add(PrincipalScope(name))
         except ValueError as exc:
-            raise ValueError(f"Unknown Council principal scope: {name}") from exc
+            raise ValueError("Unknown Council principal scope") from exc
     return frozenset(scopes)
 
 
@@ -254,6 +255,27 @@ def full_scope_principal(
         kind=kind,
         issuer=issuer,
         scopes=ALL_PRINCIPAL_SCOPES,
+    )
+
+
+def local_cli_principal(
+    principal_id: str | None = None,
+    scopes: str | Iterable[str] = tuple(
+        scope.value for scope in PrincipalScope
+    ),
+) -> Principal:
+    """Resolve the CLI's stable local declaration independently of provider keys."""
+
+    resolved_id = (
+        f"local-user:{getpass.getuser()}"
+        if principal_id is None
+        else principal_id
+    )
+    return Principal(
+        principal_id=resolved_id,
+        kind=PrincipalKind.LOCAL_USER,
+        issuer="council.cli.local",
+        scopes=parse_principal_scopes(scopes),
     )
 
 

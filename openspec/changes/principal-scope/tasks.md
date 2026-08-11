@@ -12,14 +12,14 @@
 - [x] 2.2 Enforce current principal and cumulative scope requirements in the mandatory dispatcher before handlers, policy, confirmation, filesystem access, or subprocess creation.
 - [x] 2.3 Add masked authorization metadata to correlated attempt/result and session evidence while preserving audit schema-v1 compatibility.
 - [x] 2.4 Add middleware tests for missing/invalid/mismatched/insufficient principals, scope tightening, immediate revocation, confirmation/policy non-elevation, masked audit linkage, and no side effects.
-- [ ] 2.5 Run `uv run pytest` and keep the full suite green before orchestration/framework wiring.
+- [x] 2.5 Run `uv run pytest` and keep the full suite green before orchestration/framework wiring.
 
 ## 3. Orchestration and provider boundary
 
-- [ ] 3.1 Replace raw provider-key parameters across OpenRouter and crew builders with the typed provider credential.
-- [ ] 3.2 Require `run_council` to receive a separate Council principal/current-authority source and install only principal data in `SecurityContext`.
-- [ ] 3.3 Add strict Council-specific CLI principal identity/scope settings with a full-scope local compatibility default and update `.env.example`/README configuration guidance.
-- [ ] 3.4 Add orchestration and CLI tests proving provider credentials do not authorize tools, principal data does not reach model credentials, unknown scopes fail before crews, and cleanup removes authority.
+- [x] 3.1 Replace raw provider-key parameters across OpenRouter and crew builders with the typed provider credential.
+- [x] 3.2 Require `run_council` to receive a separate Council principal/current-authority source and install only principal data in `SecurityContext`.
+- [x] 3.3 Add strict Council-specific CLI principal identity/scope settings with a full-scope local compatibility default and update `.env.example`/README configuration guidance.
+- [x] 3.4 Add orchestration and CLI tests proving provider credentials do not authorize tools, principal data does not reach model credentials, unknown scopes fail before crews, and cleanup removes authority.
 - [ ] 3.5 Run `uv run pytest` and keep the full suite green before wrapper/end-to-end coverage.
 
 ## 4. Wrapper, composite, and end-to-end bypass coverage

@@ -12,6 +12,7 @@ from rich.table import Table
 
 from council_agent.config.presets import get_preset_by_name, list_presets
 from council_agent.config.settings import get_settings
+from council_agent.llm.openrouter import OpenRouterCredential
 from council_agent.orchestrator import run_council
 from council_agent.sandbox.config import (
     apply_workspace_root,
@@ -28,6 +29,7 @@ from council_agent.security import (
     export_audit_events,
     filter_audit_events,
     load_audit_events_with_integrity,
+    local_cli_principal,
     resolve_cli_confirm_mode,
 )
 
@@ -354,7 +356,10 @@ def run(
         False,
         "--yes",
         "-y",
-        help="Skip confirmation prompts for dangerous/write operations (CI).",
+        help=(
+            "Skip confirmation prompts for dangerous/write operations (CI); "
+            "does not grant scopes or authenticate."
+        ),
     ),
 ) -> None:
     """Run the full planning → execution → verification pipeline."""
@@ -363,12 +368,34 @@ def run(
     preset_name = preset or settings.council_default_preset
     selected = get_preset_by_name(settings.presets_dir, preset_name)
     confirm_mode = resolve_cli_confirm_mode(yes=yes, is_tty=sys.stdin.isatty())
+    try:
+        provider_credential = OpenRouterCredential(
+            settings.openrouter_api_key.get_secret_value(),
+        )
+        principal = local_cli_principal(
+            settings.council_principal_id,
+            settings.council_principal_scopes,
+        )
+    except ValueError as exc:
+        console.print(
+            Panel(
+                str(exc),
+                title="Principal Configuration Error",
+                border_style="red",
+            )
+        )
+        raise typer.Exit(code=2) from exc
+    scope_summary = ", ".join(
+        sorted(scope.value for scope in principal.scopes)
+    )
 
     console.print(
         Panel(
             f"[bold]Preset:[/bold] {selected.name}\n"
             f"[bold]Workspace:[/bold] {settings.council_workspace_root}\n"
             f"[bold]Confirm:[/bold] {confirm_mode.value}\n"
+            f"[bold]Principal:[/bold] {principal.audit_ref}\n"
+            f"[bold]Scopes:[/bold] {scope_summary}\n"
             f"[bold]Task:[/bold] {prompt}",
             title="Council Agent",
             border_style="blue",
@@ -379,7 +406,8 @@ def run(
         result = run_council(
             prompt=prompt,
             preset=selected,
-            api_key=settings.openrouter_api_key,
+            provider_credential=provider_credential,
+            principal=principal,
             verbose=verbose,
             confirm_mode=confirm_mode,
         )

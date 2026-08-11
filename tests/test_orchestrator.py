@@ -5,9 +5,11 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from council_agent.config.presets import get_preset_by_name
+from council_agent.llm.openrouter import OpenRouterCredential
 from council_agent.orchestrator import run_council
 from council_agent.security import (
     ConfirmMode,
+    full_scope_principal,
     get_confirmation_policy,
     without_security_context,
 )
@@ -19,6 +21,8 @@ from council_agent.types import (
 )
 
 PRESETS_DIR = __import__("pathlib").Path(__file__).resolve().parents[1] / "presets"
+PROVIDER_CREDENTIAL = OpenRouterCredential("fake-key")
+TEST_PRINCIPAL = full_scope_principal("orchestrator-tests", issuer="pytest")
 
 
 @pytest.fixture(autouse=True)
@@ -62,11 +66,19 @@ def test_run_council_pass_no_escalation(
         ) as mock_verify,
         patch("council_agent.orchestrator.build_escalation_crew") as mock_esc,
     ):
-        result = run_council("test prompt", preset, "fake-key")
+        result = run_council(
+            "test prompt",
+            preset,
+            PROVIDER_CREDENTIAL,
+            TEST_PRINCIPAL,
+        )
 
     mock_plan_build.assert_called_once()
     mock_exec_build.assert_called_once()
     mock_verify_build.assert_called_once()
+    assert mock_plan_build.call_args.args[1] is PROVIDER_CREDENTIAL
+    assert mock_exec_build.call_args.args[1] is PROVIDER_CREDENTIAL
+    assert mock_verify_build.call_args.args[1] is PROVIDER_CREDENTIAL
     mock_plan.assert_called_once()
     mock_exec.assert_called_once()
     mock_verify.assert_called_once()
@@ -108,7 +120,12 @@ def test_run_council_fail_triggers_escalation(
             "council_agent.orchestrator.run_escalation", return_value=escalated
         ) as mock_esc_run,
     ):
-        result = run_council("test prompt", preset, "fake-key")
+        result = run_council(
+            "test prompt",
+            preset,
+            PROVIDER_CREDENTIAL,
+            TEST_PRINCIPAL,
+        )
 
     mock_esc_build.assert_called_once()
     mock_esc_run.assert_called_once()
@@ -150,7 +167,8 @@ def test_run_council_installs_and_resets_confirm_policy(
         run_council(
             "test prompt",
             preset,
-            "fake-key",
+            PROVIDER_CREDENTIAL,
+            TEST_PRINCIPAL,
             confirm_mode=ConfirmMode.AUTO,
         )
 
@@ -217,7 +235,8 @@ def test_run_council_installs_and_resets_audit_logger(
         run_council(
             "audit probe",
             preset,
-            "fake-key",
+            PROVIDER_CREDENTIAL,
+            TEST_PRINCIPAL,
             project_root=Path(tmp_path),
         )
 
@@ -274,7 +293,12 @@ def test_run_council_without_sandbox_skips_audit_logger(
         ),
         patch("council_agent.orchestrator.run_verification", return_value=verdict),
     ):
-        run_council("no audit", preset, "fake-key")
+        run_council(
+            "no audit",
+            preset,
+            PROVIDER_CREDENTIAL,
+            TEST_PRINCIPAL,
+        )
 
     assert seen == [True]
     assert get_audit_logger() is None
@@ -340,7 +364,8 @@ def test_run_council_installs_and_resets_project_policy(
         run_council(
             "policy probe",
             preset,
-            "fake-key",
+            PROVIDER_CREDENTIAL,
+            TEST_PRINCIPAL,
             project_root=Path(tmp_path),
         )
 
@@ -392,7 +417,8 @@ def test_run_council_invalid_policy_fails_before_crews(
             run_council(
                 "bad policy",
                 preset,
-                "fake-key",
+                PROVIDER_CREDENTIAL,
+                TEST_PRINCIPAL,
                 project_root=Path(tmp_path),
             )
 
@@ -449,7 +475,8 @@ def test_run_council_unknown_policy_field_fails_before_runtime_state(
         run_council(
             "unknown policy field",
             preset,
-            "fake-key",
+            PROVIDER_CREDENTIAL,
+            TEST_PRINCIPAL,
             project_root=tmp_path,
         )
 
@@ -500,7 +527,12 @@ def test_run_council_missing_policy_uses_defaults(
         ),
         patch("council_agent.orchestrator.run_verification", return_value=verdict),
     ):
-        run_council("no policy file", preset, "fake-key")
+        run_council(
+            "no policy file",
+            preset,
+            PROVIDER_CREDENTIAL,
+            TEST_PRINCIPAL,
+        )
 
     assert seen == [True]
     assert get_active_policy() is None
@@ -556,7 +588,8 @@ def test_run_council_uses_one_security_context_snapshot(
         run_council(
             "one context",
             preset,
-            "fake-key",
+            PROVIDER_CREDENTIAL,
+            TEST_PRINCIPAL,
             confirm_mode=ConfirmMode.AUTO,
         )
 
@@ -565,6 +598,7 @@ def test_run_council_uses_one_security_context_snapshot(
     context = seen_contexts[0]
     assert context.confirmation.mode is ConfirmMode.AUTO
     assert context.policy_version == "builtin"
+    assert context.principal is TEST_PRINCIPAL
     assert get_security_context() is None
 
 
@@ -587,7 +621,46 @@ def test_run_council_exception_closes_security_context(
 
     with patch("council_agent.orchestrator.run_planning", side_effect=_fail):
         with pytest.raises(RuntimeError, match="planning failed"):
-            run_council("fails", preset, "fake-key")
+            run_council(
+                "fails",
+                preset,
+                PROVIDER_CREDENTIAL,
+                TEST_PRINCIPAL,
+            )
 
     assert seen_active == [True]
     assert get_security_context() is None
+
+
+def test_run_council_rejects_raw_provider_key_before_crews() -> None:
+    preset = get_preset_by_name(PRESETS_DIR, "glm-stack")
+
+    with (
+        patch("council_agent.orchestrator.build_planning_crew") as planning,
+        pytest.raises(TypeError, match="OpenRouterCredential"),
+    ):
+        run_council(
+            "raw provider key",
+            preset,
+            "fake-key",  # type: ignore[arg-type]
+            TEST_PRINCIPAL,
+        )
+
+    planning.assert_not_called()
+
+
+def test_provider_credential_cannot_substitute_for_principal() -> None:
+    preset = get_preset_by_name(PRESETS_DIR, "glm-stack")
+
+    with (
+        patch("council_agent.orchestrator.build_planning_crew") as planning,
+        pytest.raises(TypeError, match="Council Principal"),
+    ):
+        run_council(
+            "wrong principal type",
+            preset,
+            PROVIDER_CREDENTIAL,
+            PROVIDER_CREDENTIAL,  # type: ignore[arg-type]
+        )
+
+    planning.assert_not_called()

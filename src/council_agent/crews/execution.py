@@ -7,7 +7,7 @@ from crewai import Agent, Crew, Process, Task
 from council_agent.config.presets import Preset
 from council_agent.crews.base import crew_output_text
 from council_agent.crews.execution_tools import build_execution_tools
-from council_agent.llm.openrouter import make_llm
+from council_agent.llm.openrouter import OpenRouterCredential, make_llm
 from council_agent.tools import ToolCallTracker
 from council_agent.types import ExecutionResult, PlanArtifact
 
@@ -43,7 +43,7 @@ def _format_plan_sections(plan: PlanArtifact) -> dict[str, str]:
 
 def build_execution_crew(
     preset: Preset,
-    api_key: str,
+    provider_credential: OpenRouterCredential,
     *,
     enable_tools: bool = True,
 ) -> Crew:
@@ -54,7 +54,7 @@ def build_execution_crew(
         role="Task Executor",
         goal="Execute the plan and produce a complete deliverable",
         backstory=EXECUTION_BACKSTORY,
-        llm=make_llm(role.model, role.temperature, api_key),
+        llm=make_llm(role.model, role.temperature, provider_credential),
         tools=tools,
         verbose=False,
     )

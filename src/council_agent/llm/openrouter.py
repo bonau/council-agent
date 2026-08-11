@@ -28,12 +28,18 @@ class OpenRouterCredential:
         return "OpenRouterCredential(api_key='[REDACTED]')"
 
 
-def make_llm(model: str, temperature: float, api_key: str) -> LLM:
+def make_llm(
+    model: str,
+    temperature: float,
+    credential: OpenRouterCredential,
+) -> LLM:
     """Create a CrewAI LLM instance routed through OpenRouter."""
+    if not isinstance(credential, OpenRouterCredential):
+        raise TypeError("credential must be an OpenRouterCredential")
     model_id = model if model.startswith("openrouter/") else f"openrouter/{model}"
     return LLM(
         model=model_id,
         base_url=OPENROUTER_BASE_URL,
-        api_key=api_key,
+        api_key=credential.get_secret_value(),
         temperature=temperature,
     )
