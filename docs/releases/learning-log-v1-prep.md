@@ -458,3 +458,10 @@ alpha 才開始實作 Trust Tier 0/1/2 runtime；本紀錄中的 v0.9.x 工作�
 - 文件影響：README、known issues、v0.9.x handoff、smoke／manual status 與本 learning log 更新；未 bump package version。
 - Archive：delta 已同步，change 移至 `openspec/changes/archive/2026-08-11-shell-containment/`；tasks 28/28 complete，無 active `shell-containment` delta。
 - 下一步：合併 feature PR；之後只在 `release/0.9.1` 做版本 bump／tag。
+
+### 2026-08-11 16:58 UTC — v0.9.1 merged and tagged
+
+- 狀態：通過
+- 基準：tag `v0.9.1`、PR #8、archive `2026-08-11-shell-containment`
+- 驗證：`./scripts/check.sh` 291 passed
+- 下一步：開 `policy-middleware` change（v0.9.2）
