@@ -4,7 +4,7 @@
 - [x] 1.2 Extend audit records/loading with backward-compatible phase, request/action correlation, decision, and optional attempt success
 - [x] 1.3 Implement the dispatcher core for context validation, registered action lookup, limits, result normalization, tracker/session recording, and attempt/result audit
 - [x] 1.4 Add focused unit tests for missing, closed, stale, mismatched, unknown-tool, limit-denied, success, failure, and correlated-audit behavior
-- [ ] 1.5 Commit and push the core phase, then run `uv run pytest` with the full existing suite green
+- [x] 1.5 Commit and push the core phase, then run `uv run pytest` with the full existing suite green
 
 ## 2. Public Tool Boundary
 
