@@ -637,3 +637,10 @@ alpha 才開始實作 Trust Tier 0/1/2 runtime；本紀錄中的 v0.9.x 工作�
   - Product scope boundary不提供hostile in-process Python、OS/process/network或host owner/root隔離。
 - 文件影響：README、`.env.example`、known issues、v0.9.x handoff、security/tools/orchestration delta與本learning log；feature branch不bump package version。
 - 下一步：sync三份delta、strict validate、active-change check、archive與post-archive check；後續唯一主要問題是v0.9.6 `session-auth`。
+
+### 2026-08-11 18:40 UTC — v0.9.5 tagged
+
+- 狀態：通過
+- 基準：tag `v0.9.5`
+- 驗證：422 passed
+- 下一步：v0.9.6 session-auth
