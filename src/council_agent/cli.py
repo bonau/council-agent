@@ -248,11 +248,8 @@ def audit_show(
     table.add_column("Seq", justify="right")
     table.add_column("Timestamp", style="dim")
     table.add_column("Tool", style="cyan")
-    table.add_column("Phase")
     table.add_column("Success")
     table.add_column("Session")
-    table.add_column("Event ID", overflow="fold")
-    table.add_column("Attempt ID", overflow="fold")
     table.add_column("Error", overflow="fold")
 
     for event in shown:
@@ -260,7 +257,6 @@ def audit_show(
             str(event.sequence) if event.sequence is not None else "-",
             event.timestamp,
             event.tool,
-            event.phase,
             (
                 "pending"
                 if event.success is None
@@ -269,8 +265,6 @@ def audit_show(
                 else "no"
             ),
             event.session_id or "-",
-            event.event_id or "-",
-            event.attempt_event_id or "-",
             event.error or "",
         )
 
