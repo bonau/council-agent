@@ -4,7 +4,7 @@
 
 > **開發方式**：所有版本里程碑的實作，皆採 **Spec-driven Development** 並搭配 [OpenSpec](https://github.com/Fission-AI/OpenSpec)。每個 feature 分支應對應一個 OpenSpec change，詳見 [AGENTS.md](AGENTS.md)。
 
-## 現況（v0.8.0）
+## 現況（v0.9.0）
 
 | 能力 | 狀態 |
 |------|------|
@@ -22,9 +22,10 @@
 | 指令分類（read / write / dangerous） | ✅ |
 | 互動確認（`--yes`／TTY ask／無 TTY refuse） | ✅ |
 | 審計日誌（`.council/audit/` + `council audit show`／`export`） | ✅ |
-| 政策 / Trust Tier | ❌（v0.9–v1.0） |
+| 政策設定檔（`council.policy.yaml`） | ✅ |
+| Trust Tier | ❌（v1.0） |
 
-v0.8 已發佈：sandbox 已初始化時，tool 呼叫寫入結構化審計日誌；可用 `council audit show`／`export` 檢視與匯出。指令分類與互動確認能力保留；政策檔與完整信任框架見後續里程碑。
+v0.9 已發佈：可選專案根目錄 `council.policy.yaml` 自訂允許／拒絕指令 pattern 與額外敏感路徑；`run_command` 與 `WorkspaceGuard` 會套用政策。指令分類、互動確認與審計能力保留；Trust Tier 與完整 Policy Middleware 見 v1.0。
 
 ## 目標里程碑
 
