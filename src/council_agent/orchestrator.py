@@ -201,8 +201,6 @@ def run_council(
             execution_crew = build_execution_crew(
                 preset,
                 api_key,
-                tracker=tracker,
-                session=session,
             )
             verification_crew = build_verification_crew(preset, api_key)
 

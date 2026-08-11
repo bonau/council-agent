@@ -31,10 +31,10 @@ def no_default_security_context(workspace_root: Path) -> None:
         yield
 
 
-def _mock_execution_build(preset, api_key, *, tracker=None, session=None):
+def _mock_execution_build(preset, api_key, *, enable_tools=True):
     """Build a fake crew whose kickoff invokes real tool wrappers."""
-    assert tracker is not None
-    tools = {t.name: t for t in build_execution_tools(tracker, session=session)}
+    assert enable_tools is True
+    tools = {t.name: t for t in build_execution_tools()}
 
     crew = MagicMock()
 
@@ -188,8 +188,16 @@ def test_e2e_run_with_sandbox_writes_audit_events(
 
     assert get_audit_logger() is None
     events = load_audit_events(default_audit_events_path(tmp_path))
-    assert len(events) == 3
+    assert len(events) == 6
     assert {e.tool for e in events} == {"write_file", "list_dir", "run_command"}
+    assert [event.phase for event in events].count("attempt") == 3
+    assert [event.phase for event in events].count("result") == 3
+    action_ids = {event.action_id for event in events}
+    assert None not in action_ids
+    assert all(
+        sum(event.action_id == action_id for event in events) == 2
+        for action_id in action_ids
+    )
     session = SessionManager.latest(tmp_path)
     assert session is not None
     assert all(e.session_id == session.meta.session_id for e in events)

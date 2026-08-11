@@ -7,23 +7,31 @@ from unittest.mock import MagicMock, patch
 
 from council_agent.config.presets import get_preset_by_name
 from council_agent.crews.execution import build_execution_crew, run_execution
-from council_agent.crews.execution_tools import LIMIT_MESSAGE, build_execution_tools
+from council_agent.crews.execution_tools import build_execution_tools
 from council_agent.sandbox.config import init_sandbox
 from council_agent.sandbox.session import SessionManager
-from council_agent.tools import ToolCallTracker, ToolResult
+from council_agent.security import (
+    AuditLogger,
+    SecurityContext,
+    default_audit_events_path,
+    get_security_context,
+    load_audit_events,
+    security_context,
+    without_security_context,
+)
+from council_agent.tools import ToolCallTracker, ToolResult, run_command
 from council_agent.types import PlanArtifact
 
 PRESETS_DIR = Path(__file__).resolve().parents[1] / "presets"
 
 
-def _tools_by_name(tracker: ToolCallTracker, session: SessionManager | None = None):
-    tools = build_execution_tools(tracker, session=session)
+def _tools_by_name():
+    tools = build_execution_tools()
     return {t.name: t for t in tools}
 
 
 def test_build_execution_tools_exposes_six_tools() -> None:
-    tracker = ToolCallTracker(max_tool_calls=10)
-    tools = build_execution_tools(tracker)
+    tools = build_execution_tools()
     names = {t.name for t in tools}
     assert names == {
         "read_file",
@@ -36,8 +44,9 @@ def test_build_execution_tools_exposes_six_tools() -> None:
 
 
 def test_read_write_list_delete_via_wrappers(workspace_root: Path) -> None:
-    tracker = ToolCallTracker(max_tool_calls=20)
-    tools = _tools_by_name(tracker)
+    context = get_security_context()
+    assert context is not None
+    tools = _tools_by_name()
 
     written = tools["write_file"].run(path="note.txt", content="hello")
     assert "hello" in written or "succeeded" in written.lower()
@@ -52,27 +61,58 @@ def test_read_write_list_delete_via_wrappers(workspace_root: Path) -> None:
     assert "ERROR" not in deleted
     assert not (workspace_root / "note.txt").exists()
 
-    assert len(tracker.summaries) == 4
-    assert all(s.success for s in tracker.summaries)
+    assert len(context.tracker.summaries) == 4
+    assert all(s.success for s in context.tracker.summaries)
 
 
 def test_run_command_wrapper(workspace_root: Path) -> None:
-    tracker = ToolCallTracker(max_tool_calls=5)
-    tools = _tools_by_name(tracker)
+    context = get_security_context()
+    assert context is not None
+    tools = _tools_by_name()
     out = tools["run_command"].run(command="echo hi-from-tool")
     assert "hi-from-tool" in out
-    assert tracker.summaries[0].tool == "run_command"
-    assert tracker.summaries[0].success is True
+    assert context.tracker.summaries[0].tool == "run_command"
+    assert context.tracker.summaries[0].success is True
+
+
+def test_crew_and_direct_paths_share_denial_decision() -> None:
+    context = get_security_context()
+    assert context is not None
+    direct = run_command("unknown-product-command")
+    tools = _tools_by_name()
+
+    formatted = tools["run_command"].run(command="unknown-product-command")
+    crew_summary = context.tracker.summaries[-1]
+
+    assert formatted.startswith("ERROR:")
+    assert direct.metadata["decision"] == crew_summary.metadata["decision"] == "deny"
+    assert (
+        direct.metadata["rejection_reason"]
+        == crew_summary.metadata["rejection_reason"]
+        == "unsupported"
+    )
+
+
+def test_wrapper_without_context_fails_closed(workspace_root: Path) -> None:
+    target = workspace_root / "blocked.txt"
+    with without_security_context():
+        tools = _tools_by_name()
+        result = tools["write_file"].run(path="blocked.txt", content="blocked")
+
+    assert result.startswith("ERROR:")
+    assert "No SecurityContext is installed" in result
+    assert not target.exists()
 
 
 def test_tracker_limit_blocks_underlying_call(workspace_root: Path) -> None:
     tracker = ToolCallTracker(max_tool_calls=1)
-    tools = _tools_by_name(tracker)
+    context = SecurityContext.create(workspace_root, tracker=tracker)
+    with without_security_context(), security_context(context):
+        tools = _tools_by_name()
+        tools["write_file"].run(path="a.txt", content="one")
+        second = tools["write_file"].run(path="b.txt", content="two")
 
-    tools["write_file"].run(path="a.txt", content="one")
-    second = tools["write_file"].run(path="b.txt", content="two")
-
-    assert second == LIMIT_MESSAGE.format(max_tool_calls=1)
+    assert second.startswith("ERROR: Tool call limit reached (1).")
     assert len(tracker.summaries) == 1
     assert tracker.limit_reached is True
     assert not (workspace_root / "b.txt").exists()
@@ -87,23 +127,19 @@ def test_wrapper_appends_to_session(workspace_root: Path) -> None:
         project_root=workspace_root,
     )
     tracker = ToolCallTracker(max_tool_calls=5)
-    tools = _tools_by_name(tracker, session=session)
-
-    tools["write_file"].run(path="x.txt", content="y")
+    context = SecurityContext.create(
+        workspace_root,
+        tracker=tracker,
+        session=session,
+    )
+    with without_security_context(), security_context(context):
+        tools = _tools_by_name()
+        tools["write_file"].run(path="x.txt", content="y")
     assert session.meta.tool_call_count == 1
     assert session.count_tool_lines() == 1
 
 
 def test_wrapper_appends_to_audit_when_logger_installed(workspace_root: Path) -> None:
-    from council_agent.security import (
-        AuditLogger,
-        default_audit_events_path,
-        get_audit_logger,
-        load_audit_events,
-        reset_audit_logger,
-        set_audit_logger,
-    )
-
     init_sandbox(workspace_root)
     session = SessionManager.create(
         prompt="p",
@@ -115,21 +151,26 @@ def test_wrapper_appends_to_audit_when_logger_installed(workspace_root: Path) ->
         default_audit_events_path(workspace_root),
         session_id=session.meta.session_id,
     )
-    token = set_audit_logger(logger)
-    try:
-        tracker = ToolCallTracker(max_tool_calls=5)
-        tools = _tools_by_name(tracker, session=session)
+    tracker = ToolCallTracker(max_tool_calls=5)
+    context = SecurityContext.create(
+        workspace_root,
+        tracker=tracker,
+        session=session,
+        audit_logger=logger,
+    )
+    with without_security_context(), security_context(context):
+        tools = _tools_by_name()
         tools["write_file"].run(path="audited.txt", content="z")
-    finally:
-        reset_audit_logger(token)
 
-    assert get_audit_logger() is None
     events = load_audit_events(default_audit_events_path(workspace_root))
-    assert len(events) == 1
-    assert events[0].tool == "write_file"
-    assert events[0].args["path"] == "audited.txt"
-    assert events[0].session_id == session.meta.session_id
-    assert events[0].success is True
+    assert len(events) == 2
+    assert [event.phase for event in events] == ["attempt", "result"]
+    assert all(event.tool == "write_file" for event in events)
+    assert all(event.args["path"] == "audited.txt" for event in events)
+    assert all(event.session_id == session.meta.session_id for event in events)
+    assert events[1].success is True
+    assert events[0].action_id == events[1].action_id
+    assert len(tracker.summaries) == 1
     assert session.count_tool_lines() == 1
 
 
@@ -149,9 +190,7 @@ def test_build_execution_crew_mounts_tools(
     crew_instance = MagicMock()
     mock_crew.return_value = crew_instance
     preset = get_preset_by_name(PRESETS_DIR, "glm-stack")
-    tracker = ToolCallTracker(max_tool_calls=10)
-
-    result = build_execution_crew(preset, "fake-key", tracker=tracker)
+    result = build_execution_crew(preset, "fake-key")
     assert result is crew_instance
 
     kwargs = mock_agent.call_args.kwargs
@@ -170,7 +209,7 @@ def test_build_execution_crew_mounts_tools(
 @patch("council_agent.crews.execution.Task")
 @patch("council_agent.crews.execution.Agent")
 @patch("council_agent.crews.execution.make_llm")
-def test_build_execution_crew_without_tracker_has_no_tools(
+def test_build_execution_crew_can_disable_tools(
     mock_llm: MagicMock,
     mock_agent: MagicMock,
     mock_task: MagicMock,
@@ -178,7 +217,7 @@ def test_build_execution_crew_without_tracker_has_no_tools(
 ) -> None:
     mock_llm.return_value = MagicMock()
     preset = get_preset_by_name(PRESETS_DIR, "glm-stack")
-    build_execution_crew(preset, "fake-key")
+    build_execution_crew(preset, "fake-key", enable_tools=False)
     assert mock_agent.call_args.kwargs["tools"] == []
 
 
