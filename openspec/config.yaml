@@ -9,7 +9,7 @@ context: |
   Testing: uv run pytest
   Docs: README.md, ROADMAP.md, CONTRIBUTING.md, AGENTS.md
   Development policy: Spec-driven Development with OpenSpec (see AGENTS.md)
-  Current version: v0.9.1 — project policy file (`council.policy.yaml` allow/deny commands + denied_paths); audit, confirmation, and command classification retained; v1.0 prep docs landed (v0.9.1–v0.9.9 debt sequence before Trust Tier)
+  Current version: v0.9.2 — project policy file (`council.policy.yaml` allow/deny commands + denied_paths); audit, confirmation, and command classification retained; v1.0 prep docs landed (v0.9.1–v0.9.9 debt sequence before Trust Tier)
   Capabilities: tools (filesystem, shell, run_tests, CrewAI wrappers, policy gates on run_command), sandbox (WorkspaceGuard with policy denied_paths union, session, CLI, audit dir), orchestration (tracker, max_tool_calls, auto summaries, confirmation policy, audit logger install, project policy install), security (command classifier, interactive confirmation modes ask/auto/refuse/compat, structured audit JSONL + council audit show/export, council.policy.yaml allow/deny commands and denied_paths)
 
 rules:
