@@ -560,7 +560,7 @@ alpha 才開始實作 Trust Tier 0/1/2 runtime；本紀錄中的 v0.9.x 工作�
 
 ### 2026-08-11 — v0.9.4 audit-integrity implementation
 
-- 狀態：implementation完成，等待 final gate／archive
+- 狀態：implementation與active-change gate通過，已archive，等待 post-archive gate／feature merge
 - 基準：branch `cursor/v094-audit-integrity-d691`、package v0.9.3、change `audit-integrity`
 - 原始邊界問題：
   - `.council/audit/`、sessions與sandbox control data位於 Agent workspace；policy file雖已保護，父 `.council` 與 nested control plane仍可被支援的 path action指定。
@@ -582,7 +582,8 @@ alpha 才開始實作 Trust Tier 0/1/2 runtime；本紀錄中的 v0.9.x 工作�
   - Middleware/CLI/sandbox integration：41 passed。
   - Full regression：375 passed。
   - Active-change `./scripts/check.sh`：375 passed；changes strict 1/1；main specs strict 5/5；exit code 0。
-  - Archive／post-archive結果待 gate 後回填。
+  - Archive：15/15 tasks complete；delta已同步；`openspec/changes/archive/2026-08-11-audit-integrity/`。
+  - Post-archive結果待 final gate 後回填。
 - 詳細 evidence：[`v0.9.4-audit-integrity-evidence.md`](v0.9.4-audit-integrity-evidence.md)。
 - 剩餘風險／延期責任：
   - Per-event digest不是 predecessor hash chain；沒有 externally signed/anchored head，無法可靠偵測 tail deletion或 whole-log self-consistent replacement。完整 integrity product仍屬 v1.0。
@@ -590,4 +591,11 @@ alpha 才開始實作 Trust Tier 0/1/2 runtime；本紀錄中的 v0.9.x 工作�
   - Principal／scope、session authentication、workspace外 user-owned grant store與decision matrix仍依 v0.9.5–v0.9.8。
   - Trust Tier 0/1/2 runtime與 `council trust` 仍只屬 v1.0-alpha。
 - 文件影響：known issues、v0.9.x handoff、security/sandbox/orchestration/tools deltas與本 learning log；feature branch不 bump package version。
-- 下一步：完成 full regression、sync/archive；後續 change 是 v0.9.5 `principal-scope`。
+- 下一步：完成 post-archive gate並合併 feature；後續 change 是 v0.9.5 `principal-scope`。
+
+### 2026-08-11 18:10 UTC — v0.9.4 tagged
+
+- 狀態：通過
+- 基準：tag `v0.9.4`
+- 驗證：375 passed
+- 下一步：v0.9.5 principal-scope
