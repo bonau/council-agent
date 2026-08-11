@@ -3,20 +3,31 @@
 from __future__ import annotations
 
 import re
+import shlex
+import shutil
 import subprocess
 import sys
 import time
+from dataclasses import dataclass
+from pathlib import Path
 from typing import Any
 
-from council_agent.sandbox.workspace import WorkspaceGuardError, get_workspace_guard
+from council_agent.sandbox.workspace import (
+    DeniedPathError,
+    WorkspaceGuardError,
+    get_workspace_guard,
+)
 from council_agent.security import (
     ActionKind,
+    ClassificationResult,
     CommandCategory,
+    RejectedCommandAnalysis,
     classify_command,
     evaluate_command_policy,
     require_confirmation,
 )
 from council_agent.tools.base import ToolResult, _err, _ok
+from council_agent.tools.pytest_args import RejectedPytestArgs, parse_pytest_args
 
 _SUMMARY_LINE = re.compile(
     r"(?:(\d+)\s+passed)?(?:,\s*)?(?:(\d+)\s+failed)?(?:,\s*)?"
@@ -24,6 +35,20 @@ _SUMMARY_LINE = re.compile(
     re.IGNORECASE,
 )
 _FAILURE_LINE = re.compile(r"^(?:FAILED|E\s+).+", re.MULTILINE)
+
+
+@dataclass(frozen=True)
+class _PreparedAction:
+    """An authorized action's stable display and retained execution argv."""
+
+    display_argv: tuple[str, ...]
+    execution_argv: tuple[str, ...]
+    category: CommandCategory
+    matched_rule: str
+
+    @property
+    def canonical_command(self) -> str:
+        return shlex.join(self.display_argv)
 
 
 def parse_pytest_output(combined: str, exit_code: int) -> dict[str, Any]:
@@ -57,28 +82,61 @@ def parse_pytest_output(combined: str, exit_code: int) -> dict[str, Any]:
     }
 
 
-def run_command(
-    command: str,
-    cwd: str | None = None,
-    *,
-    timeout_sec: int = 120,
-) -> ToolResult:
-    try:
-        workdir = get_workspace_guard().resolve_cwd(cwd)
-    except WorkspaceGuardError as exc:
-        return _err(str(exc))
+def _guard_refusal(exc: WorkspaceGuardError) -> ToolResult:
+    if isinstance(exc, DeniedPathError):
+        reason = "denied_path"
+    else:
+        reason = "workspace_boundary"
+    return _err(str(exc), rejection_reason=reason)
 
-    if not command or not command.strip():
-        return _err("Empty command")
 
-    policy_decision = evaluate_command_policy(command)
+def _analysis_refusal(analysis: RejectedCommandAnalysis) -> ToolResult:
+    return _err(
+        analysis.error,
+        rejection_reason=analysis.rejection_reason.value,
+    )
+
+
+def _classification_metadata(action: _PreparedAction) -> dict[str, Any]:
+    return {
+        "classification": action.category.value,
+        "matched_rule": action.matched_rule,
+    }
+
+
+def _prepare_command_action(
+    analysis: ClassificationResult,
+) -> _PreparedAction | ToolResult:
+    """Resolve a bare executable once and retain it for shell-free execution."""
+
+    executable = shutil.which(analysis.argv[0])
+    if executable is None:
+        return _err(
+            f"Supported executable is not available: {analysis.argv[0]}",
+            rejection_reason="unsupported",
+            classification=analysis.category.value,
+            matched_rule=analysis.matched_rule,
+        )
+    return _PreparedAction(
+        display_argv=analysis.argv,
+        execution_argv=(str(Path(executable).resolve()), *analysis.argv[1:]),
+        category=analysis.category,
+        matched_rule=analysis.matched_rule,
+    )
+
+
+def _authorize_action(action: _PreparedAction) -> dict[str, Any] | ToolResult:
+    """Apply project policy and confirmation to one canonical action."""
+
+    class_meta = _classification_metadata(action)
+    policy_decision = evaluate_command_policy(action.canonical_command)
     if not policy_decision.allowed:
         reason = (
             policy_decision.reason.value
             if policy_decision.reason is not None
             else "denied"
         )
-        meta: dict[str, Any] = {"policy_decision": reason}
+        meta: dict[str, Any] = {**class_meta, "policy_decision": reason}
         if policy_decision.matched_pattern is not None:
             meta["policy_pattern"] = policy_decision.matched_pattern
             detail = f"matched: {policy_decision.matched_pattern}"
@@ -86,35 +144,42 @@ def run_command(
             detail = "not in allowed_commands"
         return _err(f"Command denied by policy ({reason}; {detail})", **meta)
 
-    classification = classify_command(command)
-    class_meta: dict[str, Any] = {"classification": classification.category.value}
-    if classification.matched_rule is not None:
-        class_meta["matched_rule"] = classification.matched_rule
-
     gate_kind: ActionKind | None = None
-    if classification.category is CommandCategory.DANGEROUS:
+    if action.category is CommandCategory.DANGEROUS:
         gate_kind = ActionKind.DANGEROUS_SHELL
-    elif classification.category is CommandCategory.WRITE:
+    elif action.category is CommandCategory.WRITE:
         gate_kind = ActionKind.WRITE_SHELL
 
-    if gate_kind is not None:
-        decision = require_confirmation(gate_kind, command)
-        if decision.outcome.value != "compat_allow":
-            class_meta["confirmation"] = decision.outcome.value
-        if not decision.allowed:
-            rule = classification.matched_rule or "unknown"
-            label = classification.category.value
-            return _err(
-                f"Command classified as {label} (matched: {rule}); "
-                f"confirmation {decision.outcome.value}",
-                **class_meta,
-            )
+    if gate_kind is None:
+        return class_meta
 
+    decision = require_confirmation(gate_kind, action.canonical_command)
+    if decision.outcome.value != "compat_allow":
+        class_meta["confirmation"] = decision.outcome.value
+    if decision.allowed:
+        return class_meta
+    return _err(
+        f"Command classified as {action.category.value} "
+        f"(matched: {action.matched_rule}); confirmation {decision.outcome.value}",
+        **class_meta,
+    )
+
+
+def _execute_prepared(
+    action: _PreparedAction,
+    *,
+    workdir: Path,
+    timeout_sec: int,
+    authorization_meta: dict[str, Any] | None = None,
+) -> ToolResult:
+    """Execute retained argv directly, with no serialization or shell."""
+
+    class_meta = authorization_meta or _classification_metadata(action)
     start = time.monotonic()
     try:
         result = subprocess.run(
-            command,
-            shell=True,
+            list(action.execution_argv),
+            shell=False,
             capture_output=True,
             text=True,
             cwd=str(workdir),
@@ -142,12 +207,54 @@ def run_command(
         "duration_ms": duration_ms,
         **class_meta,
     }
-
     if result.returncode == 0:
         return _ok(stdout, **metadata)
+    return _err(
+        stderr or f"Command exited with code {result.returncode}",
+        output=stdout,
+        **metadata,
+    )
 
-    error = stderr or f"Command exited with code {result.returncode}"
-    return _err(error, output=stdout, **metadata)
+
+def run_command(
+    command: str,
+    cwd: str | None = None,
+    *,
+    timeout_sec: int = 120,
+) -> ToolResult:
+    guard = get_workspace_guard()
+    try:
+        workdir = guard.resolve_cwd(cwd)
+    except WorkspaceGuardError as exc:
+        return _guard_refusal(exc)
+
+    analysis = classify_command(command)
+    if isinstance(analysis, RejectedCommandAnalysis):
+        return _analysis_refusal(analysis)
+
+    try:
+        for operand in analysis.path_operands:
+            guard.resolve_from(workdir, operand)
+    except WorkspaceGuardError as exc:
+        refusal = _guard_refusal(exc)
+        refusal.metadata.update(
+            classification=analysis.category.value,
+            matched_rule=analysis.matched_rule,
+        )
+        return refusal
+
+    prepared = _prepare_command_action(analysis)
+    if isinstance(prepared, ToolResult):
+        return prepared
+    authorization = _authorize_action(prepared)
+    if isinstance(authorization, ToolResult):
+        return authorization
+    return _execute_prepared(
+        prepared,
+        workdir=workdir,
+        timeout_sec=timeout_sec,
+        authorization_meta=authorization,
+    )
 
 
 def run_tests(
@@ -156,33 +263,62 @@ def run_tests(
     *,
     timeout_sec: int = 120,
 ) -> ToolResult:
+    guard = get_workspace_guard()
     try:
-        test_path = get_workspace_guard().resolve(path)
+        test_path = guard.resolve(path)
     except WorkspaceGuardError as exc:
-        return _err(str(exc))
+        return _guard_refusal(exc)
 
     if not test_path.exists():
-        return _err(f"Test path does not exist: {path}")
+        return _err(
+            f"Test path does not exist: {path}",
+            rejection_reason="unsupported",
+        )
 
-    cmd_parts = [
-        sys.executable,
+    parsed_args = parse_pytest_args(args)
+    if isinstance(parsed_args, RejectedPytestArgs):
+        return _err(
+            parsed_args.error,
+            rejection_reason=parsed_args.rejection_reason.value,
+        )
+    try:
+        for operand in parsed_args.path_operands:
+            guard.resolve_from(guard.root, operand)
+    except WorkspaceGuardError as exc:
+        return _guard_refusal(exc)
+
+    action_argv = (
+        str(Path(sys.executable).resolve()),
         "-m",
         "pytest",
         str(test_path),
         "-q",
         "--tb=line",
-    ]
-    if args.strip():
-        cmd_parts.extend(args.split())
-
-    command = " ".join(cmd_parts)
-    result = run_command(command, timeout_sec=timeout_sec)
+        *parsed_args.argv,
+    )
+    action = _PreparedAction(
+        display_argv=action_argv,
+        execution_argv=action_argv,
+        category=CommandCategory.WRITE,
+        matched_rule="run-tests",
+    )
+    authorization = _authorize_action(action)
+    if isinstance(authorization, ToolResult):
+        return authorization
+    result = _execute_prepared(
+        action,
+        workdir=guard.root,
+        timeout_sec=timeout_sec,
+        authorization_meta=authorization,
+    )
 
     combined = result.output
     if result.error:
         combined = f"{combined}\n{result.error}".strip()
 
-    exit_code = int(result.metadata.get("exit_code", 1))
+    if "exit_code" not in result.metadata:
+        return result
+    exit_code = int(result.metadata["exit_code"])
     parsed = parse_pytest_output(combined, exit_code)
     metadata = {**result.metadata, **parsed}
 
