@@ -288,7 +288,7 @@ def run_tests(
         return _guard_refusal(exc)
 
     action_argv = (
-        str(Path(sys.executable).resolve()),
+        sys.executable,
         "-m",
         "pytest",
         str(test_path),

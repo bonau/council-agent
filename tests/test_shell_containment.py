@@ -368,7 +368,7 @@ def test_run_tests_preserves_path_and_quoted_arg_boundaries(tmp_path: Path) -> N
     assert result.success
     submitted = run_mock.call_args.args[0]
     assert submitted == [
-        str(Path(sys.executable).resolve()),
+        sys.executable,
         "-m",
         "pytest",
         str(tests_dir.resolve()),
