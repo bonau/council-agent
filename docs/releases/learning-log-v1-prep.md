@@ -765,7 +765,8 @@ alpha 才開始實作 Trust Tier 0/1/2 runtime；本紀錄中的 v0.9.x 工作�
   - Pure matrix focused 44 passed；phase-1 full 542 passed。
   - Pure+dispatcher focused 51 passed；phase-2 full 549 passed。
   - All v0.9.8 suites focused 55 passed；phase-3 full 553 passed。
-  - Active/post-archive `./scripts/check.sh`與archive path待final gate後回填。
+  - Active-change `./scripts/check.sh`：553 passed；change 1/1、main specs 5/5 strict passed；exit 0。
+  - Post-archive `./scripts/check.sh`與archive path待final gate後回填。
   - 詳細evidence：[`v0.9.8-trust-decision-matrix-evidence.md`](v0.9.8-trust-decision-matrix-evidence.md)。
 - 剩餘風險／v1.0-alpha接線：
   - Tier runtime須另加typed Tier 0/1/2 source與tier→grant/interaction translator，顯式exact grant lookup，再把closed result傳入vector；不得改policy/scope/auth/invalid-grant precedence。
