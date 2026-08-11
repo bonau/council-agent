@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import stat
 from pathlib import Path
 
 import pytest
@@ -17,6 +18,7 @@ from council_agent.sandbox.config import (
     write_council_config,
 )
 from council_agent.sandbox.session import SessionManager
+from council_agent.security import REDACTION_MARKER
 
 
 def test_init_sandbox_creates_config(tmp_path: Path) -> None:
@@ -112,6 +114,91 @@ def test_session_create_append_finalize(tmp_path: Path) -> None:
     assert meta["ended_at"]
     assert meta["status"] == "completed"
     assert meta["tool_call_count"] == 2
+
+
+def test_session_persistence_redacts_and_retains_audit_linkage(
+    tmp_path: Path,
+) -> None:
+    init_sandbox(tmp_path)
+    secret = "sk-or-v1-abcdefghijklmnopqrstuv"
+    session = SessionManager.create(
+        prompt=f"Use api_key={secret}",
+        preset="glm-stack",
+        workspace_root=tmp_path,
+        project_root=tmp_path,
+    )
+    session.append_tool_call(
+        "run_command",
+        {"command": f"echo Bearer {secret}", "token": secret},
+        success=False,
+        metadata={"nested": {"access_token": secret}},
+        output=f"Authorization: Bearer {secret}",
+        error=f"password={secret}",
+        request_id="request-1",
+        action_id="action-1",
+        audit_attempt_event_id="sha256:attempt",
+        audit_result_event_id="sha256:result",
+    )
+
+    meta_text = session.meta_path.read_text(encoding="utf-8")
+    tools_text = session.tools_path.read_text(encoding="utf-8")
+    assert secret not in meta_text
+    assert secret not in tools_text
+    assert REDACTION_MARKER in meta_text
+    record = json.loads(tools_text)
+    assert record["args"]["token"] == REDACTION_MARKER
+    assert record["metadata"]["nested"]["access_token"] == REDACTION_MARKER
+    assert record["request_id"] == "request-1"
+    assert record["action_id"] == "action-1"
+    assert record["audit_attempt_event_id"] == "sha256:attempt"
+    assert record["audit_result_event_id"] == "sha256:result"
+
+
+@pytest.mark.skipif(not hasattr(stat, "S_IMODE"), reason="POSIX mode unavailable")
+def test_control_plane_permissions_are_owner_only(tmp_path: Path) -> None:
+    init_sandbox(tmp_path)
+    session = SessionManager.create(
+        prompt="work",
+        preset="glm-stack",
+        workspace_root=tmp_path,
+        project_root=tmp_path,
+    )
+
+    directories = [
+        tmp_path / ".council",
+        tmp_path / ".council" / "audit",
+        tmp_path / ".council" / "sessions",
+        session.session_dir,
+    ]
+    files = [
+        tmp_path / ".council" / "config.yaml",
+        session.meta_path,
+        session.tools_path,
+    ]
+    assert all(stat.S_IMODE(path.stat().st_mode) == 0o700 for path in directories)
+    assert all(stat.S_IMODE(path.stat().st_mode) == 0o600 for path in files)
+
+
+def test_loading_legacy_session_metadata_redacts_prompt(tmp_path: Path) -> None:
+    session_dir = tmp_path / "legacy"
+    session_dir.mkdir()
+    secret = "sk-or-v1-abcdefghijklmnopqrstuv"
+    (session_dir / "meta.json").write_text(
+        json.dumps(
+            {
+                "session_id": "legacy",
+                "prompt": f"api_key={secret}",
+                "preset": "glm-stack",
+                "workspace_root": str(tmp_path),
+                "started_at": "2026-08-11T00:00:00+00:00",
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    loaded = SessionManager.load(session_dir)
+    assert secret not in loaded.meta.prompt
+    assert REDACTION_MARKER in loaded.meta.prompt
 
 
 def test_session_create_requires_initialized_sandbox(tmp_path: Path) -> None:

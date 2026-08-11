@@ -10,7 +10,11 @@ from typer.testing import CliRunner
 
 from council_agent.cli import app
 from council_agent.sandbox.config import init_sandbox
-from council_agent.security import AuditLogger, default_audit_events_path
+from council_agent.security import (
+    REDACTION_MARKER,
+    AuditLogger,
+    default_audit_events_path,
+)
 
 runner = CliRunner()
 
@@ -28,6 +32,7 @@ def test_audit_show_empty(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> No
     result = runner.invoke(app, ["audit", "show"])
     assert result.exit_code == 0, result.output
     assert "No audit events" in result.output
+    assert "Integrity: empty" in result.output
 
 
 def test_audit_show_populated(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -39,6 +44,7 @@ def test_audit_show_populated(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -
     assert "run_command" in result.output
     assert "list_dir" in result.output
     assert "s1" in result.output
+    assert "integrity=verified" in result.output
 
 
 def test_audit_show_session_filter(
@@ -73,6 +79,9 @@ def test_audit_export_all_jsonl(
     lines = [json.loads(line) for line in out.read_text().splitlines() if line.strip()]
     assert len(lines) == 3
     assert lines[0]["tool"] == "write_file"
+    assert lines[0]["event_id"].startswith("sha256:")
+    assert "Integrity:" in result.output
+    assert "verified" in result.output
 
 
 def test_audit_export_filtered_by_session(
@@ -99,3 +108,61 @@ def test_audit_export_invalid_format(
     )
     assert result.exit_code == 1
     assert "Invalid" in result.output
+
+
+def test_legacy_show_and_export_are_sanitized_and_unverified(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    init_sandbox(tmp_path)
+    secret = "sk-or-v1-abcdefghijklmnopqrstuv"
+    events_path = default_audit_events_path(tmp_path)
+    events_path.write_text(
+        json.dumps(
+            {
+                "timestamp": "2026-08-11T00:00:00+00:00",
+                "tool": "run_command",
+                "args": {"api_key": secret},
+                "success": False,
+                "error": f"Authorization: Bearer {secret}",
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    monkeypatch.chdir(tmp_path)
+
+    shown = runner.invoke(app, ["audit", "show"])
+    out = tmp_path / "legacy-export.jsonl"
+    exported = runner.invoke(app, ["audit", "export", str(out)])
+
+    assert shown.exit_code == 0, shown.output
+    assert "legacy_unverified" in shown.output
+    assert secret not in shown.output
+    assert exported.exit_code == 0, exported.output
+    assert "legacy_unverified" in exported.output
+    exported_text = out.read_text(encoding="utf-8")
+    assert secret not in exported_text
+    assert REDACTION_MARKER in exported_text
+
+
+def test_invalid_audit_history_fails_show_and_export_without_output(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _seed_events(tmp_path)
+    events_path = default_audit_events_path(tmp_path)
+    lines = events_path.read_text(encoding="utf-8").splitlines()
+    events_path.write_text("\n".join([lines[0], lines[2]]) + "\n", encoding="utf-8")
+    monkeypatch.chdir(tmp_path)
+
+    shown = runner.invoke(app, ["audit", "show"])
+    out = tmp_path / "must-not-exist.jsonl"
+    exported = runner.invoke(app, ["audit", "export", str(out)])
+
+    assert shown.exit_code == 1
+    assert "Audit Integrity Error" in shown.output
+    assert "expected sequence" in shown.output
+    assert exported.exit_code == 1
+    assert "Audit Integrity Error" in exported.output
+    assert not out.exists()

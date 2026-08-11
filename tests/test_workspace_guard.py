@@ -140,6 +140,39 @@ def test_project_policy_cannot_remove_its_builtin_protection(
             guard.resolve("council.policy.yaml")
 
 
+@pytest.mark.parametrize(
+    "path",
+    [
+        ".council",
+        ".council/audit",
+        ".council/audit/events.jsonl",
+        ".council/sessions/session-1/tools.jsonl",
+        ".council/config.yaml",
+        ".council/auth/future.json",
+        ".council/grants/future.json",
+        "nested/.council",
+        "nested/.council/audit/events.jsonl",
+        "nested/.council/sessions/session-1/meta.json",
+    ],
+)
+def test_resolve_denied_control_plane_paths(
+    guard: WorkspaceGuard,
+    path: str,
+) -> None:
+    with pytest.raises(DeniedPathError, match="denied"):
+        guard.resolve(path)
+
+
+def test_project_policy_cannot_remove_control_plane_protection(
+    guard: WorkspaceGuard,
+) -> None:
+    policy = CouncilPolicy(schema_version=1, denied_paths=[])
+
+    with active_policy(policy):
+        with pytest.raises(DeniedPathError, match=r"\.council/audit"):
+            guard.resolve(".council/audit/events.jsonl")
+
+
 def test_resolve_new_file_in_workspace(guard: WorkspaceGuard) -> None:
     resolved = guard.resolve("new/nested/file.txt")
     assert resolved.name == "file.txt"
