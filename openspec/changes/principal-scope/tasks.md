@@ -40,6 +40,6 @@
 - [x] 6.1 Run `uv run pytest`.
 - [x] 6.2 Run `npx @fission-ai/openspec@latest validate --changes --strict`.
 - [x] 6.3 Sync all `principal-scope` deltas into `openspec/specs/` and run `npx @fission-ai/openspec@latest validate --specs --strict`.
-- [ ] 6.4 Run `./scripts/check.sh` with the active change and record the exact passing test/spec counts in evidence.
-- [ ] 6.5 Archive `principal-scope`, verify there are no active changes, and run post-archive `./scripts/check.sh`.
-- [ ] 6.6 Confirm no version bump, release tag, session authentication, grant store, or Trust Tier runtime entered the diff.
+- [x] 6.4 Run `./scripts/check.sh` with the active change and record the exact passing test/spec counts in evidence.
+- [x] 6.5 Archive `principal-scope`, verify there are no active changes, and run post-archive `./scripts/check.sh`.
+- [x] 6.6 Confirm no version bump, release tag, session authentication, grant store, or Trust Tier runtime entered the diff.
