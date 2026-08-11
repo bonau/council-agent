@@ -35,12 +35,12 @@
 - [x] 5.2 Close SEC-P0-002/V1-003 with evidence references in `docs/releases/v1.0-alpha-known-issues.md`
 - [x] 5.3 Append v0.9.2 decisions, entry-point inventory, bypass closure, correlation evidence, and deferred risks to `docs/releases/learning-log-v1-prep.md`
 - [x] 5.4 Mark v0.9.2 implementation/handoff state and next v0.9.3 boundary in `docs/releases/v0.9.x-handoff.md`
-- [ ] 5.5 Commit and push documentation, then run `uv run pytest` with the full suite green
+- [x] 5.5 Commit and push documentation, then run `uv run pytest` with the full suite green
 
 ## 6. Verification and Spec Sync
 
-- [ ] 6.1 Run `uv run pytest` and record the final test count
-- [ ] 6.2 Run `npx @fission-ai/openspec@latest validate --changes --strict`
-- [ ] 6.3 Sync security, tools, and orchestration deltas into `openspec/specs/` and inspect the merged requirements
+- [x] 6.1 Run `uv run pytest` and record the final test count
+- [x] 6.2 Run `npx @fission-ai/openspec@latest validate --changes --strict`
+- [x] 6.3 Sync security, tools, and orchestration deltas into `openspec/specs/` and inspect the merged requirements
 - [ ] 6.4 Run `npx @fission-ai/openspec@latest validate --specs --strict`
 - [ ] 6.5 Run `./scripts/check.sh`, confirm no version fields changed, and make the final pre-archive commit/push
