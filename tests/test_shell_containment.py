@@ -149,7 +149,10 @@ def test_parser_refusals_never_start_subprocess(command: str, reason: str) -> No
 
 
 def test_policy_uses_canonical_quoting_and_execution_uses_same_args() -> None:
-    policy = CouncilPolicy(allowed_commands=["echo 'hello world'"])
+    policy = CouncilPolicy(
+        schema_version=1,
+        allowed_commands=["echo 'hello world'"],
+    )
     with (
         active_policy(policy),
         mock.patch(
@@ -168,7 +171,7 @@ def test_policy_uses_canonical_quoting_and_execution_uses_same_args() -> None:
 
 
 def test_policy_denial_precedes_confirmation_for_canonical_action() -> None:
-    policy = CouncilPolicy(denied_commands=["mkdir *"])
+    policy = CouncilPolicy(schema_version=1, denied_commands=["mkdir *"])
     with (
         active_policy(policy),
         mock.patch(
@@ -445,7 +448,7 @@ def test_run_tests_policy_precedes_confirmation_and_execution(
 ) -> None:
     tests_dir = tmp_path / "tests"
     tests_dir.mkdir()
-    policy = CouncilPolicy(denied_commands=["*pytest*"])
+    policy = CouncilPolicy(schema_version=1, denied_commands=["*pytest*"])
     with (
         active_policy(policy),
         mock.patch(

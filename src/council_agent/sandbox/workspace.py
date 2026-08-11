@@ -14,6 +14,8 @@ DEFAULT_DENIED_PATTERNS: tuple[str, ...] = (
     ".git/**",
     ".council/secrets",
     ".council/secrets/**",
+    "council.policy.yaml",
+    "**/council.policy.yaml",
 )
 
 

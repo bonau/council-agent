@@ -468,7 +468,7 @@ alpha 才開始實作 Trust Tier 0/1/2 runtime；本紀錄中的 v0.9.x 工作�
 
 ### 2026-08-11 17:26 UTC — v0.9.2 Policy Middleware 實作與 regression
 
-- 狀態：runtime／integration regression 通過；OpenSpec sync／archive 與 post-archive gate 待完成
+- 狀態：runtime／integration regression、OpenSpec sync／archive、active-change 與 post-archive gate 全部通過
 - 基準：branch `cursor/v092-policy-middleware-d691`、pre-archive implementation revision `884e278`、package v0.9.1、change `policy-middleware`
 - 原始旁路：
   - direct `tools.filesystem`／`tools.shell` 呼叫只執行 tool-local guard，沒有 wrapper-owned tracker、session、audit。
@@ -513,3 +513,40 @@ alpha 才開始實作 Trust Tier 0/1/2 runtime；本紀錄中的 v0.9.x 工作�
 - 基準：tag `v0.9.2`、PR #9
 - 驗證：315 passed
 - 下一步：v0.9.3 `policy-trust-boundary`
+
+### 2026-08-11 17:58 UTC — v0.9.3 policy-trust-boundary 實作與 regression
+
+- 狀態：runtime／integration regression 通過；OpenSpec sync／archive 與 post-archive gate 待完成
+- 基準：branch `cursor/v093-policy-trust-boundary-d691`、runtime revision `88bd476`、package v0.9.2、change `policy-trust-boundary`
+- 原始邊界問題：
+  - Project-owned `council.policy.yaml` 位於 workspace，卻沒有明確規定只能縮權；`allowed_commands` 的名稱容易被誤解為授權。
+  - Policy model 沒有 schema discriminator 且 `extra="ignore"`，`denied_command`、`trust_tier`、未來 restriction 等未知欄位會靜默消失。
+  - Middleware 的 `policy_version="v0.9-unversioned"` 只是 label，無法證明 snapshot 綁定哪個已驗證 schema。
+  - Policy 檔本身不在 built-in denied paths，filesystem／受支援 shell path action 可直接改寫後影響下一個 run。
+- 決策：
+  - 採 required integer `schema_version: 1`；string／float／boolean、future version、缺 version、unknown／typo／授權型欄位與已知欄位錯誤型別都拒絕整份檔案，不提供 silent legacy fallback。
+  - Pydantic error 只輸出 path、field location 與 message，不包含未知欄位 `input`／context，避免將 grant token 等值回顯。
+  - Project policy 欄位集合只含 command allowlist filter、command deny 與 path deny。Allow 是 intersection，不會跳過 unsupported rejection、containment、confirmation 或未來 authorization；deny/path 與 built-in 採 union。
+  - `SecurityContext` 由 policy snapshot 推導 `builtin`／`project-policy/v1` 並驗證一致；legacy derived view 同步更新 policy、workspace 與 label。
+  - Root 與 nested `council.policy.yaml` 納入 built-in deny；filesystem guard failure 現在帶 `denied_path`／`workspace_boundary` reason，使 middleware 記為 deny。
+- 相容性影響：
+  - 舊 unversioned policy 必須加 `schema_version: 1` 並移除三個 restriction list 以外欄位；空 policy 檔也會拒絕。
+  - 過去可預先放置但被忽略的 `trust_tier`／`max_tool_calls` 等欄位不再接受；runtime upgrade 與 policy schema migration 必須同步。
+  - Agent product tools 不再可直接讀 policy 內容；政策應由 project owner／host 邊界管理。
+- 驗證：
+  - strict loader／restrict-only phase：324 passed，exit code 0。
+  - context snapshot／orchestrator pre-runtime fail-fast phase：328 passed，exit code 0。
+  - root／nested policy guard、public read/write/delete、shell no-process sentinel phase：334 passed，exit code 0。
+  - Unknown、typo、wrong version、secret-bearing `grant` error、known+unknown whole-file refusal均有單元測試；invalid policy 在 session／context／crew 建立前失敗。
+  - Public filesystem 與 `rm council.policy.yaml` refusal 斷言原始內容不變，shell subprocess call count 為 0。
+  - Active-change `./scripts/check.sh`：334 passed；changes strict 1/1；main specs strict 5/5；exit code 0。
+  - Post-archive `./scripts/check.sh`（archive commit `48d2272`）：334 passed；no active changes；main specs strict 5/5；exit code 0。
+  - 詳細 evidence：[`v0.9.3-policy-trust-boundary-evidence.md`](v0.9.3-policy-trust-boundary-evidence.md)。
+- 剩餘風險／延期責任：
+  - Path deny 是 product tool boundary，不是 OS sandbox；`run_tests` 執行的專案程式碼、host user、未建模 executable 或外部程序仍可依 host 權限改寫 workspace。
+  - Audit control-plane、secret redaction、sequence／gap 與 hash chain 屬 v0.9.4；本版只保護 policy filename 的支援 tool paths。
+  - Principal／scope、session authentication、workspace 外 user-owned grant store、decision matrix 分別屬 v0.9.5–v0.9.8；project policy 不暫代 grant。
+  - Trust Tier 0/1/2 runtime 與 `council trust` 仍只屬 v1.0-alpha。
+- 文件影響：README、known issues、v0.9.x handoff、security／sandbox／orchestration deltas與本 learning log 更新；feature branch 不 bump version。
+- Archive：17/17 tasks complete；delta 已同步；change 移至 `openspec/changes/archive/2026-08-11-policy-trust-boundary/`。
+- 下一步：合併 feature PR；之後只在 `release/0.9.3` 做版本 bump／tag。

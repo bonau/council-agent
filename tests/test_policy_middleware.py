@@ -4,13 +4,18 @@ from __future__ import annotations
 
 import contextvars
 import json
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
 
 from council_agent.sandbox.session import SessionManager, SessionMeta
+from council_agent.security import CouncilPolicy, active_policy
 from council_agent.security.audit import AuditLogger, load_audit_events
 from council_agent.security.middleware import (
+    POLICY_VERSION_BUILTIN,
+    POLICY_VERSION_PROJECT_V1,
+    POLICY_VERSION_UNVERSIONED,
     SecurityContext,
     SecurityContextError,
     _TOOL_HANDLERS,
@@ -130,6 +135,47 @@ def test_audit_session_mismatch_is_rejected(tmp_path: Path) -> None:
             session_id="context-session",
             audit_logger=logger,
         )
+
+
+def test_context_derives_policy_version_from_snapshot(tmp_path: Path) -> None:
+    builtin = SecurityContext.create(tmp_path)
+    project = SecurityContext.create(
+        tmp_path,
+        policy=CouncilPolicy(
+            schema_version=1,
+            denied_commands=["curl *"],
+        ),
+    )
+
+    assert builtin.policy_version == POLICY_VERSION_BUILTIN
+    assert project.policy_version == POLICY_VERSION_PROJECT_V1
+
+
+def test_context_rejects_mismatched_policy_version(tmp_path: Path) -> None:
+    context = replace(
+        SecurityContext.create(tmp_path),
+        policy_version=POLICY_VERSION_UNVERSIONED,
+    )
+
+    with pytest.raises(SecurityContextError, match="does not match"):
+        context.validate(require_active=False)
+
+
+def test_legacy_policy_view_updates_snapshot_version(tmp_path: Path) -> None:
+    context = SecurityContext.create(tmp_path)
+    policy = CouncilPolicy(schema_version=1, denied_paths=["secrets/**"])
+
+    with security_context(context):
+        assert get_security_context() is not None
+        assert get_security_context().policy_version == POLICY_VERSION_BUILTIN
+        with active_policy(policy):
+            assert get_security_context() is not None
+            assert (
+                get_security_context().policy_version
+                == POLICY_VERSION_PROJECT_V1
+            )
+        assert get_security_context() is not None
+        assert get_security_context().policy_version == POLICY_VERSION_BUILTIN
 
 
 def test_unknown_tool_is_denied_and_audited(tmp_path: Path) -> None:

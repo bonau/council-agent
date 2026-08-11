@@ -16,7 +16,13 @@ from council_agent.security.middleware import (
     invoke,
     without_security_context,
 )
-from council_agent.tools import read_file, run_command, run_tests, write_file
+from council_agent.tools import (
+    delete_file,
+    read_file,
+    run_command,
+    run_tests,
+    write_file,
+)
 from council_agent.tools.filesystem import _write_file
 
 
@@ -59,6 +65,65 @@ def test_direct_public_api_is_tracked_and_correlated(tmp_path: Path) -> None:
     assert summary.metadata["action_id"] == result.metadata["action_id"]
     assert summary.metadata["request_id"] == context.request_id
     assert summary.metadata["decision"] == "allow"
+
+
+def test_public_filesystem_tools_cannot_access_project_policy(
+    tmp_path: Path,
+) -> None:
+    target = tmp_path / "council.policy.yaml"
+    original = 'schema_version: 1\ndenied_commands:\n  - "curl *"\n'
+    target.write_text(original, encoding="utf-8")
+
+    results = [
+        read_file("council.policy.yaml"),
+        write_file("council.policy.yaml", "schema_version: 1\n"),
+        delete_file("council.policy.yaml"),
+    ]
+
+    assert all(result.success is False for result in results)
+    assert all(
+        result.metadata["rejection_reason"] == "denied_path"
+        for result in results
+    )
+    assert all(result.metadata["decision"] == "deny" for result in results)
+    assert target.read_text(encoding="utf-8") == original
+
+
+def test_public_write_cannot_change_nested_project_policy(
+    tmp_path: Path,
+) -> None:
+    nested = tmp_path / "nested"
+    nested.mkdir()
+    target = nested / "council.policy.yaml"
+    original = "schema_version: 1\n"
+    target.write_text(original, encoding="utf-8")
+
+    result = write_file(
+        "nested/council.policy.yaml",
+        "schema_version: 2\n",
+    )
+
+    assert result.success is False
+    assert result.metadata["rejection_reason"] == "denied_path"
+    assert result.metadata["decision"] == "deny"
+    assert target.read_text(encoding="utf-8") == original
+
+
+def test_supported_shell_cannot_delete_project_policy(
+    tmp_path: Path,
+) -> None:
+    target = tmp_path / "council.policy.yaml"
+    original = "schema_version: 1\n"
+    target.write_text(original, encoding="utf-8")
+
+    with mock.patch("council_agent.tools.shell.subprocess.run") as run_mock:
+        result = run_command("rm council.policy.yaml")
+
+    assert result.success is False
+    assert result.metadata["rejection_reason"] == "denied_path"
+    assert result.metadata["decision"] == "deny"
+    assert target.read_text(encoding="utf-8") == original
+    run_mock.assert_not_called()
 
 
 def test_public_package_exports_only_dispatcher_backed_functions() -> None:

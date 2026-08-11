@@ -8,7 +8,7 @@ from contextvars import ContextVar, Token
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
-from typing import Iterator
+from typing import Iterator, Literal
 
 import yaml
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
@@ -16,6 +16,7 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError
 from council_agent.sandbox.workspace import DEFAULT_DENIED_PATTERNS
 
 POLICY_FILENAME = "council.policy.yaml"
+CURRENT_POLICY_SCHEMA_VERSION = 1
 
 
 class PolicyError(Exception):
@@ -41,10 +42,11 @@ class PolicyCommandDecision:
 
 
 class CouncilPolicy(BaseModel):
-    """Validated subset of ``council.policy.yaml`` fields for v0.9."""
+    """Validated restrict-only project policy schema."""
 
-    model_config = ConfigDict(extra="ignore")
+    model_config = ConfigDict(extra="forbid", strict=True)
 
+    schema_version: Literal[1]
     allowed_commands: list[str] = Field(default_factory=list)
     denied_commands: list[str] = Field(default_factory=list)
     denied_paths: list[str] = Field(default_factory=list)
@@ -90,11 +92,41 @@ def load_policy_file(project_root: Path | str) -> CouncilPolicy | None:
             f"Policy file {path} must contain a mapping at the top level"
         )
 
+    if "schema_version" not in raw:
+        raise PolicyValidationError(
+            f"Invalid policy schema in {path}: missing required field "
+            f"'schema_version'; migrate by adding "
+            f"schema_version: {CURRENT_POLICY_SCHEMA_VERSION}"
+        )
+
+    schema_version = raw["schema_version"]
+    if type(schema_version) is not int:
+        raise PolicyValidationError(
+            f"Invalid policy schema in {path}: field 'schema_version' must be "
+            f"integer {CURRENT_POLICY_SCHEMA_VERSION}, got "
+            f"{type(schema_version).__name__}"
+        )
+    if schema_version != CURRENT_POLICY_SCHEMA_VERSION:
+        raise PolicyValidationError(
+            f"Invalid policy schema in {path}: unsupported schema_version "
+            f"{schema_version}; supported schema_version is "
+            f"{CURRENT_POLICY_SCHEMA_VERSION}"
+        )
+
     try:
         return CouncilPolicy.model_validate(raw)
     except ValidationError as exc:
+        issues: list[str] = []
+        for error in exc.errors(
+            include_url=False,
+            include_context=False,
+            include_input=False,
+        ):
+            location = ".".join(str(part) for part in error["loc"]) or "<root>"
+            issues.append(f"{location}: {error['msg']}")
         raise PolicyValidationError(
-            f"Invalid policy schema in {path}: {exc}"
+            f"Invalid policy schema version {CURRENT_POLICY_SCHEMA_VERSION} "
+            f"in {path}: {'; '.join(issues)}"
         ) from exc
 
 

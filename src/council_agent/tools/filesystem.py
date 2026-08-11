@@ -4,7 +4,11 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from council_agent.sandbox.workspace import WorkspaceGuardError
+from council_agent.sandbox.workspace import (
+    DeniedPathError,
+    WorkspaceBoundaryError,
+    WorkspaceGuardError,
+)
 from council_agent.security.confirm import ActionKind, evaluate_confirmation
 from council_agent.security.middleware import (
     SecurityContext,
@@ -16,12 +20,22 @@ from council_agent.tools.base import ToolResult, _err, _ok
 _ENCODING = "utf-8"
 
 
+def _guard_error(error: WorkspaceGuardError) -> ToolResult:
+    if isinstance(error, DeniedPathError):
+        reason = "denied_path"
+    elif isinstance(error, WorkspaceBoundaryError):
+        reason = "workspace_boundary"
+    else:
+        reason = "workspace_guard"
+    return _err(str(error), rejection_reason=reason)
+
+
 def _read_file(context: SecurityContext, *, path: str) -> ToolResult:
     context.validate(require_active=True)
     try:
         target = context.workspace.resolve(path)
     except WorkspaceGuardError as exc:
-        return _err(str(exc))
+        return _guard_error(exc)
     try:
         if not target.exists():
             return _err(f"File not found: {path}")
@@ -46,7 +60,7 @@ def _write_file(
     try:
         target = context.workspace.resolve(path)
     except WorkspaceGuardError as exc:
-        return _err(str(exc))
+        return _guard_error(exc)
 
     decision = evaluate_confirmation(
         context.confirmation,
@@ -79,7 +93,7 @@ def _list_dir(context: SecurityContext, *, path: str) -> ToolResult:
     try:
         target = context.workspace.resolve(path)
     except WorkspaceGuardError as exc:
-        return _err(str(exc))
+        return _guard_error(exc)
     try:
         if not target.exists():
             return _err(f"Directory not found: {path}")
@@ -99,7 +113,7 @@ def _delete_file(context: SecurityContext, *, path: str) -> ToolResult:
     try:
         target = context.workspace.resolve(path)
     except WorkspaceGuardError as exc:
-        return _err(str(exc))
+        return _guard_error(exc)
 
     decision = evaluate_confirmation(
         context.confirmation,
