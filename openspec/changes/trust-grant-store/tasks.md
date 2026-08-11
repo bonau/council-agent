@@ -25,10 +25,10 @@
 
 ## 4. Documentation and evidence
 
-- [ ] 4.1 Create `docs/releases/v0.9.7-trust-grant-store-evidence.md` with threat model, storage/schema/canonicalization, authentication, atomicity/concurrency, denial/bypass/no-side-effect matrix, redaction, recovery/backup/downgrade guidance, and test counts.
-- [ ] 4.2 Update `docs/releases/v1.0-alpha-known-issues.md` to close V1-008 only within the v0.9.7 store scope and retain Trust Tier/runtime limitations.
-- [ ] 4.3 Append the v0.9.7 decisions, evidence, compatibility, residual risks, and next stop to `docs/releases/learning-log-v1-prep.md`.
-- [ ] 4.4 Update `docs/releases/v0.9.x-handoff.md` with branch, task/test/archive evidence, release-branch-only version bump, and the v0.9.8 stopping point.
+- [x] 4.1 Create `docs/releases/v0.9.7-trust-grant-store-evidence.md` with threat model, storage/schema/canonicalization, authentication, atomicity/concurrency, denial/bypass/no-side-effect matrix, redaction, recovery/backup/downgrade guidance, and test counts.
+- [x] 4.2 Update `docs/releases/v1.0-alpha-known-issues.md` to close V1-008 only within the v0.9.7 store scope and retain Trust Tier/runtime limitations.
+- [x] 4.3 Append the v0.9.7 decisions, evidence, compatibility, residual risks, and next stop to `docs/releases/learning-log-v1-prep.md`.
+- [x] 4.4 Update `docs/releases/v0.9.x-handoff.md` with branch, task/test/archive evidence, release-branch-only version bump, and the v0.9.8 stopping point.
 
 ## 5. Verification, sync, and archive
 

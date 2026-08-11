@@ -690,3 +690,40 @@ alpha 才開始實作 Trust Tier 0/1/2 runtime；本紀錄中的 v0.9.x 工作�
 - 基準：tag `v0.9.6`
 - 驗證：459 passed
 - 下一步：v0.9.7 trust-grant-store
+
+### 2026-08-11 20:25 UTC — v0.9.7 trust-grant-store implementation
+
+- 狀態：store core、authenticated management、CLI 與 progressive regression 通過；OpenSpec sync／archive 與 final gate 待完成
+- 基準：branch `cursor/v097-trust-grant-store-d691`、package metadata 不 bump、change `trust-grant-store`
+- 原始邊界問題：
+  - v0.9.6 `AuthenticationManager` 與 principal resolver 都是 process-local seam；沒有 workspace 外、cross-restart persistent grant/revoke state。
+  - 若將 grant 放在 project policy／`.council`，Agent workspace write 或 project content 可嘗試自我授權／恢復已 revoke authority。
+  - 未定義 exact action/resource/scope/creator/time/expiry/ID schema、ownership/mode、atomic concurrent update、corruption與backup/downgrade行為。
+- 決策：
+  - 預設 store 為 `${XDG_DATA_HOME:-~/.local/share}/council-agent/trust/`。POSIX UID、non-symlink、workspace non-overlap、安全 user-owned ancestor、store dir `0700`、state/lock/audit file `0600`任一不可確認即 fail closed；project `.env`不選 trust root或 verifier。
+  - Schema-v1 是 canonical JSON document + monotonic revision。Grant 保存 masked principal/kind、recognized exact action、finite canonical JSON resource、sorted closed scopes、masked creator、aware create/optional expiry、UUID及 retained revoke tombstone；unknown field/schema、duplicate ID、overlapping binding、invalid lifecycle整份拒絕。
+  - v0.9.7 僅允許 authenticated self-grant，requested scopes 必須是 current principal scopes subset。Grant/revoke需`high-risk:manage`、list需`read`；一次性 proof 綁 principal/store/session/`trust-store-management`/exact arguments。Provider key、session ID、policy、confirmation、`--yes`不能形成 proof。
+  - Mutation在 validated `O_NOFOLLOW` root/lock + exclusive `flock` 下重新讀取，以同目錄 exclusive `0600` temp、file `fsync`、descriptor-relative `os.replace`、directory `fsync`提交並重讀；partial write/replace不採用。
+  - Trust audit 放在同一 user-owned control plane，沿用 schema-v1 sequence/canonical event。只記 masked store/principal/creator/grant/action/resource ref、scope/reason/correlation；CLI為 revoke 顯示 raw grant ID，但 audit不保存。
+  - `council trust grant/revoke/list`直接讀 host process principal/auth environment，不需或接受 OpenRouter authority、不讀 project `.env`，且無`--yes`／`--trust-tier`。Store lookup有明確 API，但 middleware／`SecurityContext`完全不接入。
+- 旁路／無副作用：
+  - Workspace overlap、unsafe mode、simulated wrong UID、symlink、malformed/future schema、duplicate/conflict皆拒絕；拒絕後 state absent/unchanged。
+  - Missing/wrong/replay/expired/revoked proof、management scope不足、scope expansion、other-principal revoke在mutation前拒絕。
+  - Project policy grant-like field不能滿足 authentication；Agent public `write_file` 對 user store得到`workspace_boundary`且state不存在。
+  - Injected partial `os.write`／`os.replace` failure保留 prior bytes，沒有 temp adoption；兩個 spawned processes提交後 revision=2且兩筆都存在。
+  - Audit corruption使下一個 grant 在state mutation前`trust_audit_failure`；raw verifier/principal/resource/grant UUID不在audit。
+  - 已存在 write grant 不會改變 narrowed current principal 的 middleware decision；仍為`scope_insufficient`且target absent。
+- 漸進驗證：
+  - Store core focused 25 passed；phase-1 full 484 passed。
+  - Authentication/audit core+management focused 32 passed；phase-2 full 491 passed。
+  - CLI focused 7 passed；phase-3 full 498 passed。
+  - 詳細 evidence：[`v0.9.7-trust-grant-store-evidence.md`](v0.9.7-trust-grant-store-evidence.md)。
+- Recovery／相容：
+  - Offline validation-only path不建立、鎖定、修復、truncate、migrate或rewrite candidate。Restore須停 process、保留current audit/state、維持`0700/0600`、比較revision並保存所有較新 revoke；schema downgrade/future version拒絕。
+  - POSIX ownership/lock semantics不可用時不降級。Same host user/root可整組 rollback store+audit，沒有 external anchor；這是明列限制。
+- 剩餘風險／延期責任：
+  - v0.9.8 定義 grant/policy/scope/authentication/risk/confirmation precedence matrix，但仍不啟用 tier runtime。
+  - Trust Tier 0/1/2、`--trust-tier`與 grant 消費接線只屬 v1.0-alpha；遠端同步／team IAM／anti-rollback anchor不在本版。
+  - Feature branch不 bump package version或tag；只可在後續`release/0.9.7`處理。
+- 文件影響：known issues關閉V1-008的store scope、handoff新增v0.9.7狀態、security/orchestration deltas與本learning log；不宣稱完整Trust Tier。
+- 下一步：完成active-change `check.sh`、sync/validate、archive與post-archive `check.sh`，再回填final count/path。
