@@ -4,7 +4,7 @@
 
 > **開發方式**：所有版本里程碑的實作，皆採 **Spec-driven Development** 並搭配 [OpenSpec](https://github.com/Fission-AI/OpenSpec)。每個 feature 分支應對應一個 OpenSpec change，詳見 [AGENTS.md](AGENTS.md)。
 
-## 現況（v1.0.0-beta.2）
+## 現況（v1.0.0-beta.3）
 
 | 能力 | 狀態 |
 |------|------|
@@ -28,7 +28,7 @@
 | Trust Tier 0/1/2 runtime + `--trust-tier` | ✅ |
 | Audit predecessor hash chain | ❌（GA） |
 
-已發佈基線 `v1.0.0-beta.2`：承接 beta.1 Trust Tier 凍結；Agent 公開測試矩陣（含 LIVE-01）已 PASS（ACCEPTED GATE A）；獨立真人 TTY 仍待後續 beta；GA 前補 hash chain 與剩餘 DoD。
+已發佈基線 `v1.0.0-beta.3`：承接 beta.2 Trust Tier 凍結與 Agent 公開測試證據；修復自 v0.9.8 起 GitHub Actions `test` job 因 Rich 上色拆開 `--yes` 而失敗的 CLI help 斷言。獨立真人 TTY 仍待後續 beta；GA 前補 hash chain 與剩餘 DoD。
 
 > 已知限制：shell／WorkspaceGuard 非 OS sandbox；`run_tests` 會執行 project code；ConfirmMode／`--yes` ≠ Trust Tier；project policy 不能設定 tier；audit 無 predecessor-linked／external anchor。
 
@@ -416,4 +416,4 @@ v0.1.0
 
 ---
 
-*最後更新：2026-08-11 · 策略：Tool-First 漸進式 · v0.9.x implementation 清債序列停止；v1.0-alpha 另開 change · 開發方式：Spec-driven + OpenSpec*
+*最後更新：2026-08-12 · 策略：Tool-First 漸進式 · 已發佈 v1.0.0-beta.3 · 開發方式：Spec-driven + OpenSpec*

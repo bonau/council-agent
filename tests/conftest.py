@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 import pytest
@@ -12,6 +13,18 @@ from council_agent.security.middleware import SecurityContext, security_context
 from council_agent.security.principal import full_scope_principal
 from council_agent.security.trust import TrustTier
 from council_agent.tools.tracker import ToolCallTracker
+
+_ANSI_RE = re.compile(r"\x1b\[[0-9;]*[A-Za-z]")
+
+
+def visible_cli_text(text: str) -> str:
+    """Strip ANSI SGR sequences so flag names stay contiguous.
+
+    Rich help with colour enabled renders ``--yes`` as ``-`` + reset + ``-yes``,
+    so substring checks on the raw buffer fail on GitHub Actions while passing
+    locally under ``NO_COLOR=1``.
+    """
+    return _ANSI_RE.sub("", text)
 
 
 @pytest.fixture(autouse=True)

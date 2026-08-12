@@ -22,6 +22,7 @@ from council_agent.security.principal import (
 )
 from council_agent.tools.filesystem import write_file
 from council_agent.tools.tracker import ToolCallTracker
+from conftest import visible_cli_text
 
 runner = CliRunner()
 UUID_PATTERN = re.compile(
@@ -223,13 +224,14 @@ def test_trust_cli_exposes_no_tier_or_confirmation_elevation_options(
     trust_cli_environment: tuple[Path, Path],
 ) -> None:
     help_result = runner.invoke(app, ["trust", "--help"])
+    visible_help = visible_cli_text(help_result.output)
     tier = runner.invoke(app, ["trust", "list", "--trust-tier", "2"])
     yes = runner.invoke(app, ["trust", "list", "--yes"])
 
     assert help_result.exit_code == 0
-    assert "not Trust Tier" in help_result.output
-    assert "--trust-tier" not in help_result.output
-    assert "--yes" not in help_result.output
+    assert "not Trust Tier" in visible_help
+    assert "--trust-tier" not in visible_help
+    assert "--yes" not in visible_help
     assert tier.exit_code != 0
     assert yes.exit_code != 0
 
