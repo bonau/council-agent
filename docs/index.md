@@ -2,6 +2,10 @@
 
 > 狀態：**v0.9.9 feature candidate 文件就緒／v1.0-alpha 前停止**。已發佈 package 基線是 **v0.9.8**；feature branch 不做 v0.9.9 bump/tag，也不代表 v1.0 安全能力或 alpha admission 已完成。
 
+## 開發歷程簡報
+
+- [Council Agent 開發歷程（PDF）](council-agent-development-journey.pdf) — 從 v0.1.0 到 v1.0.0-beta.2 的 16:9 簡報
+
 ## 目前基線
 
 - 套件版本：v0.9.8；v0.9.9 `evidence-closure` implementation candidate。
