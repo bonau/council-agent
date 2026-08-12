@@ -11,6 +11,11 @@
 - Current candidate 已讓未知／複合 shell fail-closed，並以 argv + `shell=False` 執行；受支援 command 的 path operands 經 `WorkspaceGuard`。Mandatory dispatcher、principal/auth/grant-store foundation/matrix evidence 與 attempt-scoped Verification 已接線。這仍**不是真正的 OS sandbox**。
 - `ConfirmMode` 不等於 Trust Tier；`--yes` 只跳過互動確認，**不等於完整授權或提權**。
 
+## 簡報
+
+- [`council-agent-dev-journey.pdf`](council-agent-dev-journey.pdf) — 開發歷程簡報（v0.1 → v1.0.0-beta.2；16:9 PDF）
+- [`generate_dev_journey_deck.py`](generate_dev_journey_deck.py) — 上述簡報的產生腳本（需系統 CJK 字型與 fpdf2）
+
 ## 測試文件
 
 - [`testing/v1.0-beta-public-testing.md`](testing/v1.0-beta-public-testing.md) — 公開 beta 測試者手冊、安全警告與停止條件。
