@@ -26,6 +26,10 @@
 - [`releases/v1.0-alpha-known-issues.md`](releases/v1.0-alpha-known-issues.md) — v1.0-alpha 前 P0／P1／P2 已知問題。
 - [`releases/v0.9.9-evidence-closure-evidence.md`](releases/v0.9.9-evidence-closure-evidence.md) — V1-010／SEC-P1-002、V1-011 的 attempt closure、文件校正與 regression 證據。
 
+## 簡報
+
+- [`presentations/council-agent-dev-journey.pdf`](presentations/council-agent-dev-journey.pdf) — 開發歷程簡報（v0.1 → v1.0.0-beta.2）。
+
 ## 使用原則
 
 1. 只在一次性、無真實秘密、可丟棄的 workspace 執行測試。
