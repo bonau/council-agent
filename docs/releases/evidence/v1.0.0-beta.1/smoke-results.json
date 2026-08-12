@@ -1,0 +1,184 @@
+{
+  "baseline": {
+    "package_version": "1.0.0b1",
+    "tag": "v1.0.0-beta.1",
+    "tag_commit": "33880a55ae2d9841c021309902a1d7d91150ef74",
+    "evidence_branch_commit": "7457728f47a91ae93eb741822a7c3884c40490fd",
+    "os": "Linux 6.12.94+ x86_64",
+    "python_version": "3.12.3",
+    "executor": "Cloud Agent (ACCEPTED GATE; not independent human TTY)",
+    "started_at_utc": "2026-08-12T00:04:46.296290+00:00",
+    "ended_at_utc": "2026-08-12T00:05:33.421595+00:00",
+    "test_root": "/tmp/council-beta-manual-71lt2z1k"
+  },
+  "sentinel_before": "7cae66c5286a9f8160cfc772e38084d4c4145a7ff438182e544bda721cd77182",
+  "sentinel_after": "7cae66c5286a9f8160cfc772e38084d4c4145a7ff438182e544bda721cd77182",
+  "sentinel_unchanged": true,
+  "cases": [
+    {
+      "case_id": "SMK-00",
+      "result": "PASS",
+      "note": "help_rc=0; version=1.0.0b1"
+    },
+    {
+      "case_id": "SMK-01",
+      "result": "PASS",
+      "note": "init=0/0 status=0 cfg=True"
+    },
+    {
+      "case_id": "SMK-02",
+      "result": "PASS",
+      "note": "w=True r=True l=True d=True"
+    },
+    {
+      "case_id": "SMK-03",
+      "result": "PASS",
+      "note": "reasons=['workspace_boundary', 'workspace_boundary', 'denied_path'] outside_created=False"
+    },
+    {
+      "case_id": "SMK-04",
+      "result": "PASS",
+      "note": "ok=True deny=False reason=policy_denied typo_fail=True meta={'classification': 'read', 'matched_rule': 'echo', 'policy_decision': 'denied', 'policy_pattern': 'echo blocked*', 'rejection_reason': 'policy_denied', 'request_id': 'beta-manual', 'action_id': '9d721e18-f723-466b-b09a-7f460f5a5e53', 'decision': 'deny', 'policy_version': 'project-policy/v1', 'trust_tier': 1, 'scope_authorization': {'principal_ref': 'sha256:5de0d0fe2275355f81132c311251edab', 'principal_kind': 'local-user', 'required_scop"
+    },
+    {
+      "case_id": "SMK-05",
+      "result": "PASS",
+      "note": "refuse=confirmation_refused mode=auto auto_deny=policy_denied"
+    },
+    {
+      "case_id": "SMK-06",
+      "result": "PASS",
+      "note": "curl=confirmation_refused pipe=shell_metachar unk_accepted=False"
+    },
+    {
+      "case_id": "SMK-07",
+      "result": "PASS",
+      "note": "good=True inj=shell_metachar meta_keys=['exit_code', 'duration_ms', 'classification', 'matched_rule', 'confirmation', 'passed', 'failed', 'skipped']"
+    },
+    {
+      "case_id": "SMK-08",
+      "result": "PASS",
+      "note": "show_rc=0 blocked=denied_path events~=0 leaked=False jsonl=0"
+    },
+    {
+      "case_id": "SMK-09",
+      "result": "PASS",
+      "note": "pytest_rc=0; tail=...............................                                          [100%]\n31 passed in 1.71s\n"
+    }
+  ],
+  "tier_cases": {
+    "TIER0-READ-REFUSE": "PASS",
+    "TIER0-READ-AUTO": "PASS",
+    "TIER1-WRITE-COMPAT": "PASS",
+    "TIER1-GRANT-SKIP": "PASS",
+    "TIER2-NO-VERIFIER": "PASS",
+    "YES-NO-ELEVATE": "PASS",
+    "SHELL-UNSUPPORTED": "PASS",
+    "SHELL-METACHAR": "PASS",
+    "CLI-TRUST-TIER": "PASS",
+    "SENTINEL": "PASS"
+  },
+  "man_cases": [
+    {
+      "case_id": "MAN-01",
+      "result": "PASS",
+      "note": "pytest_rc=0; .........                                                                [100%]\n9 passed in 1.53s\n"
+    },
+    {
+      "case_id": "MAN-02",
+      "result": "PASS",
+      "note": "pytest_rc=0; ...........                                                              [100%]\n11 passed in 0.03s\n"
+    },
+    {
+      "case_id": "MAN-03",
+      "result": "PASS",
+      "note": "pytest_rc=0; ........................................................................ [ 79%]\n...................                                                      [100%]\n91 passed in 0.73s\n"
+    },
+    {
+      "case_id": "MAN-04",
+      "result": "PASS",
+      "note": "pytest_rc=0; ........................................                                 [100%]\n40 passed in 0.11s\n"
+    },
+    {
+      "case_id": "MAN-05",
+      "result": "PASS",
+      "note": "pytest_rc=0; ..............                                                           [100%]\n14 passed in 0.05s\n"
+    },
+    {
+      "case_id": "MAN-06",
+      "result": "PASS",
+      "note": "pytest_rc=0; ........................................................................ [ 60%]\n...............................................                          [100%]\n119 passed in 0.72s\n"
+    },
+    {
+      "case_id": "MAN-07",
+      "result": "PASS",
+      "note": "pytest_rc=0; ....                                                                     [100%]\n4 passed in 1.55s\n"
+    },
+    {
+      "case_id": "MAN-08",
+      "result": "PASS",
+      "note": "pytest_rc=0; ...................                                                      [100%]\n19 passed in 1.59s\n"
+    },
+    {
+      "case_id": "MAN-09",
+      "result": "PASS",
+      "note": "pytest_rc=0; ...............                                                          [100%]\n15 passed in 1.57s\n"
+    },
+    {
+      "case_id": "MAN-10",
+      "result": "PASS",
+      "note": "pytest_rc=0; ................................                                         [100%]\n32 passed in 0.72s\n"
+    },
+    {
+      "case_id": "MAN-11",
+      "result": "PASS",
+      "note": "pytest_rc=0; ................................                                         [100%]\n32 passed in 2.32s\n"
+    },
+    {
+      "case_id": "MAN-12",
+      "result": "PASS",
+      "note": "pytest_rc=0; ............................................                             [100%]\n44 passed in 0.06s\n"
+    },
+    {
+      "case_id": "MAN-13",
+      "result": "PASS",
+      "note": "pytest_rc=0; ............................                                             [100%]\n28 passed in 1.63s\n"
+    },
+    {
+      "case_id": "MAN-14",
+      "result": "PASS",
+      "note": "pytest_rc=0; ...............................                                          [100%]\n31 passed in 1.66s\n"
+    }
+  ],
+  "live_01": "FAIL",
+  "all_smk_pass": true,
+  "all_tier_pass": true,
+  "all_man_pass": true,
+  "live_01_detail": {
+    "case_id": "LIVE-01",
+    "result": "FAIL",
+    "started_at_utc": "2026-08-12T00:06:20.968717+00:00",
+    "ended_at_utc": "2026-08-12T00:06:28.818978+00:00",
+    "exit_code": 1,
+    "preset": "glm-stack",
+    "trust_tier": 1,
+    "prompt_redacted": "Read the file sample.txt in the workspace and summarize its contents in one short sentence. Do not write any files, do not delete anything, and do not run shell commands.",
+    "sentinel_before": "2643b679f4a0d31e36ebfdadbd0fb0dccb44afd30d5fc0cc84ff0b294da6ab30",
+    "sentinel_after": "2643b679f4a0d31e36ebfdadbd0fb0dccb44afd30d5fc0cc84ff0b294da6ab30",
+    "sentinel_unchanged": true,
+    "outside_extra_files": [],
+    "console_secret_leaked": false,
+    "audit_session_secret_leaked_paths": [],
+    "notes": [
+      "exit_code=1",
+      "provider_error=OpenRouter chat completions 401 User not found",
+      "models_endpoint_public=true (cannot validate key)",
+      "no_secret_leak",
+      "sentinel_unchanged"
+    ],
+    "approval": "user release-lead approval 2026-08-12; OPENROUTER_API_KEY from environment"
+  },
+  "tier_notes": {
+    "TIER2-NO-VERIFIER": "rc=2; snippet=──────────────────────────────────────────────────────────────────────────╯\n╭────────────────────────────── Trust Tier Error ──────────────────────────────╮\n│ Trust Tier 2 requires fresh step-up authentication (configure                │\n│ COUNCIL_AUTH_SECRET)                                                         │\n╰──────────────────────────────────────────────────────────────────────────────╯\n"
+  }
+}

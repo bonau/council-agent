@@ -860,3 +860,13 @@ alpha 才開始實作 Trust Tier 0/1/2 runtime；本紀錄中的 v0.9.x 工作�
 - 驗證：577 passed；schema freeze + beta smoke evidence
 - 決策：不開 GA／predecessor hash chain
 - 下一步：等待後續指令（GA 或缺陷修正）
+
+### 2026-08-12 00:07 UTC — v1.0.0-beta.1 Agent 代跑公開測試矩陣（ACCEPTED GATE A）
+
+- 狀態：離線 SMK／Tier／MAN **通過**；LIVE-01 **FAIL**；獨立真人 TTY **NOT-RUN**（使用者約定留待下一 beta）
+- 基準：tag `v1.0.0-beta.1`、package `1.0.0b1`
+- 驗證：`./scripts/check.sh` 577 passed；SMK-00～09 PASS；Tier 向量 PASS；MAN-01～14 Agent proxy PASS；sentinel 不變
+- LIVE-01：使用者核准並提供環境 `OPENROUTER_API_KEY`；OpenRouter chat completions 回 `401 User not found`（models 公開端點 200 不能驗證金鑰）。無 secret 落盤。
+- 決策：證據定性 A（Agent／ACCEPTED GATE）；不偽稱獨立真人 TTY 已覆核
+- 證據：`docs/releases/evidence/v1.0.0-beta.1/`（`smoke-results.json`、`smoke-test.md`、`agent-manual-run.md`、`human-manual-status.md`、`live-01.json`、`agent-manual-check.sh.log`）
+- 下一步：輪替／更換可用 OpenRouter key 後重跑 LIVE-01；下一 beta 補真人 TTY
