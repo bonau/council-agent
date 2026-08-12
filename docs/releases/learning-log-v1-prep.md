@@ -880,3 +880,10 @@ alpha 才開始實作 Trust Tier 0/1/2 runtime；本紀錄中的 v0.9.x 工作�
 - 決策：更新證據；不偽稱獨立真人 TTY；不把 fallback preset 寫進 `presets/`
 - 證據：`docs/releases/evidence/v1.0.0-beta.1/live-01.json`、`live-01-console.redacted.txt`、`smoke-results.json`、`smoke-test.md`、`agent-manual-run.md`、`human-manual-status.md`
 - 下一步：下一 beta 補真人 TTY；若需預設 `glm-stack`／deepseek 路徑再驗證，待上游 rate limit／BYOK 後重跑
+
+### 2026-08-12 04:49 UTC — v1.0.0-beta.2 release
+
+- 狀態：發版 `1.0.0b2`／tag `v1.0.0-beta.2`
+- 內容：無新安全語意；納入 beta.1 Agent 公開測試證據（SMK／Tier／MAN／LIVE-01 PASS；ACCEPTED GATE A）
+- Non-goals：不開 GA；不做 predecessor hash chain；不偽稱獨立真人 TTY 已完成
+- 下一步：後續 beta 補獨立真人 TTY；GA 前補 hash chain 與剩餘 DoD
