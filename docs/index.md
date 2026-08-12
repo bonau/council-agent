@@ -1,6 +1,6 @@
 # Council Agent 文件入口
 
-> 狀態：**已發佈基線 v1.0.0-beta.3**。無新安全語意；修復自 v0.9.8 起 GitHub Actions CLI help 斷言失敗。獨立真人 TTY 仍 NOT-RUN；GA 前尚需 audit hash chain。
+> 狀態：**已發佈基線 v1.0.0-beta.4**。無新安全語意；GitHub Actions 已離開 Node 20 runtime。獨立真人 TTY 仍 NOT-RUN；GA 前尚需 audit hash chain。
 
 ## 開發歷程簡報
 
@@ -8,7 +8,7 @@
 
 ## 目前基線
 
-- 套件版本：`1.0.0b3`／tag 目標 `v1.0.0-beta.3`。
+- 套件版本：`1.0.0b4`／tag 目標 `v1.0.0-beta.4`。
 - Trust Tier 0／1／2 runtime 與 matrix-v2 已在 v1.0.0-alpha.1 啟用；beta 凍結該語意。
 - Agent 公開測試矩陣（含 LIVE-01）已 PASS（ACCEPTED GATE A）；獨立真人 TTY 仍待後續 beta。
 - 公開 beta 門檻：所有 P0 必須關閉；若仍有 P0，不得邀請外部測試者。
