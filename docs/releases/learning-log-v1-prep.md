@@ -896,3 +896,11 @@ alpha 才開始實作 Trust Tier 0/1/2 runtime；本紀錄中的 v0.9.x 工作�
 - 決策：測試改對 strip ANSI 後的 visible text 斷言，並在 help 測試強制 `FORCE_COLOR=1`。無新安全語意。納入 develop 上的開發歷程 PDF。
 - Non-goals：不開 GA；不做 predecessor hash chain；不偽稱獨立真人 TTY 已完成
 - 驗證：local `./scripts/check.sh` 578 passed；FORCE_COLOR=1 help 測試通過。GitHub Actions 綠燈後才 merge／tag。
+
+### 2026-08-12 16:26 UTC — v1.0.0-beta.4 Node 20 deprecation
+
+- 狀態：開始（release/1.0.0b4）
+- 觀察：v1.0.0-beta.3 的 `test`／`openspec` 已綠，但仍標註 Node.js 20 actions deprecated，並被強制跑在 Node 24。點名 `actions/checkout@v4`、`actions/setup-node@v4`、`astral-sh/setup-uv@v5`。
+- 決策：改用第一個宣告 `node24` 的 major（`checkout@v5`、`setup-node@v5`、`setup-uv@v7`）。OpenSpec job 的 *toolchain* 從 Node 20.19 升到 22（仍滿足 ≥ 20.19）。不跳到 setup-uv@v10（當日另有 cache 預設破壞性變更）。無新安全語意。
+- Non-goals：不開 GA；不做 predecessor hash chain；不偽稱獨立真人 TTY 已完成
+- 驗證：local `./scripts/check.sh` 578 passed。GitHub Actions 綠燈且無 Node 20 annotation 後才 merge／tag。
