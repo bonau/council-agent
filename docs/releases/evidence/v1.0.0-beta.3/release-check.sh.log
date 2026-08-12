@@ -1,0 +1,65 @@
+==> uv sync --extra dev
+==> pytest
+============================= test session starts ==============================
+platform linux -- Python 3.12.3, pytest-9.1.1, pluggy-1.6.0
+rootdir: /workspace
+configfile: pyproject.toml
+testpaths: tests
+plugins: anyio-4.14.2, mock-3.15.1
+collected 578 items
+
+tests/test_audit.py .......................                              [  3%]
+tests/test_authentication.py ...............                             [  6%]
+tests/test_cli_audit.py .........                                        [  8%]
+tests/test_cli_sandbox.py .........                                      [  9%]
+tests/test_cli_text.py .                                                 [  9%]
+tests/test_cli_trust.py .......                                          [ 11%]
+tests/test_command_classifier.py ....................................... [ 17%]
+............................                                             [ 22%]
+tests/test_confirmation.py .........                                     [ 24%]
+tests/test_crew_tools.py ...........                                     [ 26%]
+tests/test_filesystem_confirmation.py .....                              [ 26%]
+tests/test_orchestrator.py ...............                               [ 29%]
+tests/test_policy.py .......................                             [ 33%]
+tests/test_policy_middleware.py .................                        [ 36%]
+tests/test_policy_middleware_tools.py ...........                        [ 38%]
+tests/test_presets.py ....                                               [ 39%]
+tests/test_principal.py ........................                         [ 43%]
+tests/test_principal_middleware.py ...................                   [ 46%]
+tests/test_pytest_args.py ......................                         [ 50%]
+tests/test_run_command_classification.py ..........                      [ 52%]
+tests/test_run_command_policy.py .......                                 [ 53%]
+tests/test_sandbox_e2e.py ......                                         [ 54%]
+tests/test_sandbox_session.py ..........                                 [ 56%]
+tests/test_session_auth_e2e.py ...                                       [ 56%]
+tests/test_session_auth_middleware.py ............                       [ 58%]
+tests/test_session_auth_orchestration.py .......                         [ 59%]
+tests/test_shell_containment.py ........................................ [ 66%]
+............                                                             [ 68%]
+tests/test_tool_tracker.py ...                                           [ 69%]
+tests/test_tools_filesystem.py ...........                               [ 71%]
+tests/test_tools_run_tests.py ......                                     [ 72%]
+tests/test_tools_shell.py .....                                          [ 73%]
+tests/test_tools_workspace_integration.py .....                          [ 74%]
+tests/test_trust_decision_entrypoints.py ....                            [ 74%]
+tests/test_trust_decision_matrix.py .................................... [ 80%]
+........                                                                 [ 82%]
+tests/test_trust_decision_middleware.py .......                          [ 83%]
+tests/test_trust_grant_management.py .......                             [ 84%]
+tests/test_trust_grant_store.py .........................                [ 89%]
+tests/test_trust_tier.py .........                                       [ 90%]
+tests/test_verification_evidence.py ..........                           [ 92%]
+tests/test_verification_integration.py .....                             [ 93%]
+tests/test_workspace_guard.py .......................................    [100%]
+
+============================= 578 passed in 6.70s ==============================
+==> openspec validate --changes --strict
+No items found to validate.
+==> openspec validate --specs --strict
+✓ spec/orchestration
+✓ spec/release-prep
+✓ spec/sandbox
+✓ spec/security
+✓ spec/tools
+Totals: 5 passed, 0 failed (5 items)
+All checks passed.
