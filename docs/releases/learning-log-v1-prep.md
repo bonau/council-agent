@@ -860,3 +860,23 @@ alpha 才開始實作 Trust Tier 0/1/2 runtime；本紀錄中的 v0.9.x 工作�
 - 驗證：577 passed；schema freeze + beta smoke evidence
 - 決策：不開 GA／predecessor hash chain
 - 下一步：等待後續指令（GA 或缺陷修正）
+
+### 2026-08-12 00:07 UTC — v1.0.0-beta.1 Agent 代跑公開測試矩陣（ACCEPTED GATE A）
+
+- 狀態：離線 SMK／Tier／MAN **通過**；LIVE-01 **FAIL**；獨立真人 TTY **NOT-RUN**（使用者約定留待下一 beta）
+- 基準：tag `v1.0.0-beta.1`、package `1.0.0b1`
+- 驗證：`./scripts/check.sh` 577 passed；SMK-00～09 PASS；Tier 向量 PASS；MAN-01～14 Agent proxy PASS；sentinel 不變
+- LIVE-01：使用者核准並提供環境 `OPENROUTER_API_KEY`；OpenRouter chat completions 回 `401 User not found`（models 公開端點 200 不能驗證金鑰）。無 secret 落盤。
+- 決策：證據定性 A（Agent／ACCEPTED GATE）；不偽稱獨立真人 TTY 已覆核
+- 證據：`docs/releases/evidence/v1.0.0-beta.1/`（`smoke-results.json`、`smoke-test.md`、`agent-manual-run.md`、`human-manual-status.md`、`live-01.json`、`agent-manual-check.sh.log`）
+- 下一步：輪替／更換可用 OpenRouter key 後重跑 LIVE-01；下一 beta 補真人 TTY
+
+### 2026-08-12 03:14 UTC — v1.0.0-beta.1 LIVE-01 重跑（ACCEPTED GATE A）
+
+- 狀態：LIVE-01 **PASS**；離線 SMK／Tier／MAN 維持前次 PASS（未重跑）；獨立真人 TTY 仍 **NOT-RUN**
+- 基準：tag `v1.0.0-beta.1`、package `1.0.0b1`；分支 `cursor/v1-beta-agent-manual-a2f4`
+- Key：sha256 前綴由 `46345f25ad7d` 變更為 `175b4dbbf3b4`；最小 chat completions 探測 HTTP 200
+- LIVE-01：`--trust-tier 1`、安全只讀 prompt、未使用 `--yes`；`glm-stack` 因 `deepseek/deepseek-v4-flash` 上游 429 無法完成；改 disposable `live01-fallback`（未入庫）完成 Planning→Execution→Verification，verdict PASS；audit 僅 `read_file`；無 secret 落盤；sentinel 不變
+- 決策：更新證據；不偽稱獨立真人 TTY；不把 fallback preset 寫進 `presets/`
+- 證據：`docs/releases/evidence/v1.0.0-beta.1/live-01.json`、`live-01-console.redacted.txt`、`smoke-results.json`、`smoke-test.md`、`agent-manual-run.md`、`human-manual-status.md`
+- 下一步：下一 beta 補真人 TTY；若需預設 `glm-stack`／deepseek 路徑再驗證，待上游 rate limit／BYOK 後重跑

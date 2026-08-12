@@ -1,0 +1,24 @@
+╭─────────────────────────────── Council Agent ────────────────────────────────╮
+│ Preset: live01-fallback                                                      │
+│ Workspace: /tmp/council-live01-qSLM5E/workspace                              │
+│ Confirm: refuse                                                              │
+│ Trust tier: 1                                                                │
+│ Principal: sha256:e0bcaa3a4d229e254b6fcc73a8db9bea                           │
+│ Scopes: filesystem:mutate, high-risk:manage, read, shell, test               │
+│ High-risk step-up: not configured                                            │
+│ Task: Read the file sample.txt in the workspace and summarize its contents   │
+│ in one short sentence. Do not write any files, do not delete anything, and   │
+│ do not run shell commands.                                                   │
+╰──────────────────────────────────────────────────────────────────────────────╯
+
+Verdict: PASS
+Summary: The file was read successfully and summarized in one short sentence, 
+with no evidence of file modifications or shell command execution.
+Final attempt: d7eeec0d-ffb8-4df0-b377-145631a7bc59
+Attempts: 2
+Stop reason: passed
+Escalation: applied
+╭──────────────────────────────── Final Output ────────────────────────────────╮
+│ The file contains a sample phrase about a quick brown fox, along with a      │
+│ beta.1-live-rerun version marker.                                            │
+╰──────────────────────────────────────────────────────────────────────────────╯
