@@ -887,3 +887,12 @@ alpha 才開始實作 Trust Tier 0/1/2 runtime；本紀錄中的 v0.9.x 工作�
 - 內容：無新安全語意；納入 beta.1 Agent 公開測試證據（SMK／Tier／MAN／LIVE-01 PASS；ACCEPTED GATE A）
 - Non-goals：不開 GA；不做 predecessor hash chain；不偽稱獨立真人 TTY 已完成
 - 下一步：後續 beta 補獨立真人 TTY；GA 前補 hash chain 與剩餘 DoD
+
+### 2026-08-12 15:50 UTC — v1.0.0-beta.3 CI 修復
+
+- 狀態：開始（release/1.0.0b3）
+- 觀察：自 v0.9.8（`test_run_help_documents_yes_boundary_and_no_trust_tier`）起，GitHub Actions `test` job 失敗；`openspec` job 通過。本機 `./scripts/check.sh` 全綠。
+- 根因：GitHub Actions 啟用 Rich 上色，`--yes` 被渲染成 `-` + ANSI reset + `-yes`；本機 `NO_COLOR=1` 使 `--yes` 連續出現而測不到。
+- 決策：測試改對 strip ANSI 後的 visible text 斷言，並在 help 測試強制 `FORCE_COLOR=1`。無新安全語意。納入 develop 上的開發歷程 PDF。
+- Non-goals：不開 GA；不做 predecessor hash chain；不偽稱獨立真人 TTY 已完成
+- 驗證：local `./scripts/check.sh` 578 passed；FORCE_COLOR=1 help 測試通過。GitHub Actions 綠燈後才 merge／tag。
