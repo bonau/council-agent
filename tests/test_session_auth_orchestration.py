@@ -30,6 +30,7 @@ from council_agent.types import (
     VerdictStatus,
     VerificationVerdict,
 )
+from conftest import visible_cli_text
 
 PRESETS_DIR = Path(__file__).resolve().parents[1] / "presets"
 PROVIDER_CREDENTIAL = OpenRouterCredential("orchestrator-provider")
@@ -264,6 +265,7 @@ def test_cli_yes_without_verifier_passes_no_authentication(
 
 def test_cli_exposes_no_command_line_auth_secret_option() -> None:
     result = runner.invoke(app, ["run", "--help"])
+    visible = visible_cli_text(result.output)
 
-    assert result.exit_code == 0, result.output
-    assert "--auth-secret" not in result.output
+    assert result.exit_code == 0, visible
+    assert "--auth-secret" not in visible

@@ -5,6 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 from unittest import mock
 
+import pytest
 from typer.testing import CliRunner
 
 from council_agent.cli import app
@@ -35,6 +36,7 @@ from council_agent.security import (
     without_security_context,
 )
 from council_agent.tools import run_command, write_file
+from conftest import visible_cli_text
 
 runner = CliRunner()
 
@@ -136,14 +138,22 @@ def test_cli_auto_interaction_cannot_override_invalid_grant() -> None:
     assert decision.reason is TrustDecisionReason.TRUST_GRANT_INVALID
 
 
-def test_run_help_documents_yes_boundary_and_trust_tier() -> None:
-    result = runner.invoke(app, ["run", "--help"])
-    help_text = result.output.lower()
+def test_run_help_documents_yes_boundary_and_trust_tier(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # CI enables colour; Rich then splits "--yes" into "-" + "-yes".
+    monkeypatch.delenv("NO_COLOR", raising=False)
+    monkeypatch.setenv("FORCE_COLOR", "1")
+    monkeypatch.setenv("CLICOLOR_FORCE", "1")
+    monkeypatch.setenv("TERM", "xterm-256color")
+    monkeypatch.setenv("COLUMNS", "80")
 
-    compact = " ".join(result.output.lower().split())
-    assert result.exit_code == 0, result.output
-    assert "--yes" in result.output
-    assert "--trust-tier" in result.output
+    result = runner.invoke(app, ["run", "--help"])
+    visible = visible_cli_text(result.output)
+    compact = " ".join(visible.lower().split())
+    assert result.exit_code == 0, visible
+    assert "--yes" in visible
+    assert "--trust-tier" in visible
     assert "interaction prompts" in compact
     assert "grant scopes" in compact
     assert "authenticate" in compact
