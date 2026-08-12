@@ -10,6 +10,6 @@
   - 證據寫入 repo：是
 - 未宣稱：本文件**不**偽稱「一位未參與實作的人」已走完 `docs/testing/manual-test-cases.md` 的 TTY ASK 路徑。
 - 替代證據：`agent-manual-run.md`、`smoke-test.md`、`smoke-results.json`、`agent-manual-check.sh.log`。
-- LIVE-01：已嘗試；因 OpenRouter chat `401 User not found` 記 **FAIL**（見 `live-01.json`）。不影響離線 SMK／MAN／Tier PASS。
-- 剩餘風險：真人 UX／TTY ASK 路徑仍未由獨立人類覆核；責任版本：下一個 beta。
+- LIVE-01：前次因 OpenRouter chat `401 User not found` 記 FAIL；2026-08-12 重跑後 **PASS**（key 指紋變更；chat probe 200；`glm-stack` deepseek 429 後以 disposable fallback preset 完成；見 `live-01.json`）。不影響離線 SMK／MAN／Tier PASS。
+- 剩餘風險：真人 UX／TTY ASK 路徑仍未由獨立人類覆核；責任版本：下一個 beta。預設 `glm-stack`／deepseek 上游 rate limit 未在本次以同一 preset 證明。
 - 不影響：已關閉之 P0／P1 實作證據；不重開 V1-001–V1-010。
